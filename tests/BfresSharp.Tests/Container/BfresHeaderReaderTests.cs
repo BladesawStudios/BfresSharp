@@ -10,6 +10,9 @@ public sealed class BfresHeaderReaderTests
     private const string Switch10 = "4652455320202020 00000a00 fffe0300 2ad00300 0000e4cf 00d20300 a0d30300";
     private const string Switch5 = "4652455320202020 03000500 fffe0c00 a6e60500 0000d000 00130600 c02c0600";
 
+    // A Switch 2 header: the same layout as Switch with version 10.4.0.
+    private const string Switch104 = "4652455320202020 00040a00 fffe0300 2ad00300 0000e4cf 00d20300 a0d30300";
+
     // A Wii U 3.5.0.3 header: version, byte order mark, header size, file size, alignment.
     private const string WiiU3 = "46524553 03050003 feff0010 00063988 00002000";
 
@@ -33,6 +36,16 @@ public sealed class BfresHeaderReaderTests
         Assert.Equal("5.0.3", header.Version.ToString());
         Assert.Equal(404672u, header.FileSize);
         Assert.Equal(4096u, header.DataAlignment);
+    }
+
+    [Fact]
+    public void ReadsVersion104AsSwitch2()
+    {
+        BfresHeader header = BfresHeaderReader.Read(Bytes(Switch104));
+
+        Assert.Equal(BfresPlatform.Switch2, header.Platform);
+        Assert.Equal("10.4.0", header.Version.ToString());
+        Assert.True(header.Platform.UsesSwitchLayout());
     }
 
     [Fact]

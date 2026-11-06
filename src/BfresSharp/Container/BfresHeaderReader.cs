@@ -54,8 +54,10 @@ public static class BfresHeaderReader
         if (shift > MaxAlignmentShift)
             return Fail($"Alignment shift {shift} is out of range", out error);
 
-        var version = new BfresVersion(BfresPlatform.Switch, view.U32(8));
-        return new BfresHeader(BfresPlatform.Switch, order, version, view.U32(0x1C), 1u << shift);
+        uint rawVersion = view.U32(8);
+        BfresPlatform platform = BfresPlatforms.ForSwitchVersion(rawVersion);
+        var version = new BfresVersion(platform, rawVersion);
+        return new BfresHeader(platform, order, version, view.U32(0x1C), 1u << shift);
     }
 
     private static BfresHeader? ParseWiiU(ByteView view, out string? error)

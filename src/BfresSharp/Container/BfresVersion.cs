@@ -8,18 +8,18 @@ namespace BfresSharp.Container;
 /// </remarks>
 public readonly record struct BfresVersion(BfresPlatform Platform, uint Raw) : IComparable<BfresVersion>
 {
-    public int Major => (int)(Platform == BfresPlatform.Switch ? Raw >> 16 : Raw >> 24);
+    public int Major => (int)(Platform.UsesSwitchLayout() ? Raw >> 16 : Raw >> 24);
 
-    public int Minor => (int)(Platform == BfresPlatform.Switch ? (Raw >> 8) & 0xFF : (Raw >> 16) & 0xFF);
+    public int Minor => (int)(Platform.UsesSwitchLayout() ? (Raw >> 8) & 0xFF : (Raw >> 16) & 0xFF);
 
-    public int Micro => (int)(Platform == BfresPlatform.Switch ? Raw & 0xFF : (Raw >> 8) & 0xFF);
+    public int Micro => (int)(Platform.UsesSwitchLayout() ? Raw & 0xFF : (Raw >> 8) & 0xFF);
 
-    public int Revision => Platform == BfresPlatform.Switch ? 0 : (int)(Raw & 0xFF);
+    public int Revision => Platform.UsesSwitchLayout() ? 0 : (int)(Raw & 0xFF);
 
     public int CompareTo(BfresVersion other) => Raw.CompareTo(other.Raw);
 
     public override string ToString()
     {
-        return Platform == BfresPlatform.Switch ? $"{Major}.{Minor}.{Micro}" : $"{Major}.{Minor}.{Micro}.{Revision}";
+        return Platform.UsesSwitchLayout() ? $"{Major}.{Minor}.{Micro}" : $"{Major}.{Minor}.{Micro}.{Revision}";
     }
 }
