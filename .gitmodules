@@ -10,3 +10,12 @@
 [submodule "lib/vendor/TxtgSharp"]
 	path = lib/vendor/TxtgSharp
 	url = https://github.com/BladesawStudios/TxtgSharp
+[submodule "lib/vendor/Yaz0Sharp"]
+	path = lib/vendor/Yaz0Sharp
+	url = https://github.com/BladesawStudios/Yaz0Sharp
+[submodule "lib/vendor/ZsDicSharp"]
+	path = lib/vendor/ZsDicSharp
+	url = https://github.com/BladesawStudios/ZsDicSharp
+[submodule "lib/vendor/SarcSharp"]
+	path = lib/vendor/SarcSharp
+	url = https://github.com/BladesawStudios/SarcSharp
