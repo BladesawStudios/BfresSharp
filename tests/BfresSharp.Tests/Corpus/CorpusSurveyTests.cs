@@ -5,7 +5,7 @@ namespace BfresSharp.Tests.Corpus;
 
 public sealed class CorpusSurveyTests(ITestOutputHelper output)
 {
-    [Fact]
+    [CorpusFact]
     public void ListsPlatformsAndVersionsInTheCorpus()
     {
         foreach (string folder in Corpus.Folders)

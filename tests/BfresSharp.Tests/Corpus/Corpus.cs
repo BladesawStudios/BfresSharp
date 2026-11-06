@@ -14,6 +14,9 @@ internal static class Corpus
 {
     internal const string Env = "BFRES_CORPUS";
 
+    // BFRES_CORPUS_STRIDE=n keeps every n-th file, for quick runs.
+    internal static int Stride => int.TryParse(Environment.GetEnvironmentVariable("BFRES_CORPUS_STRIDE"), out int n) && n > 1 ? n : 1;
+
     internal static IReadOnlyList<string> Folders
     {
         get
@@ -26,7 +29,8 @@ internal static class Corpus
     internal static IEnumerable<(string Name, byte[] Data)> BfresFiles(string folder)
     {
         using ZsDic? zs = FindRomfs(folder) is { } romfs ? ZsDic.FromRomfs(romfs) : null;
-        foreach (string path in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Where(IsBfresName))
+        int stride = Stride;
+        foreach (string path in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Where(IsBfresName).Where((_, index) => index % stride == 0))
         {
             byte[] data = File.ReadAllBytes(path);
             if (ZsDic.IsCompressed(data)) data = zs?.Decompress(data, path) ?? data;
