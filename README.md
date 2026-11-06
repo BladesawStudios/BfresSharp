@@ -2,8 +2,6 @@
 
 Reader and writer for the Nintendo BFRES graphics archive format, on Wii U and Switch.
 
-Work in progress. Today it reads and validates the file header (platform, byte order, version, size, data alignment).
-
 ```csharp
 BfresHeader header = BfresHeaderReader.Read(File.ReadAllBytes("model.bfres"));
 Console.WriteLine($"{header.Platform} {header.Version}");
