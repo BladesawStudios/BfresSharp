@@ -1,0 +1,12 @@
+[submodule "lib/vendor/TexSharp"]
+	path = lib/vendor/TexSharp
+	url = https://github.com/BladesawStudios/TexSharp
+[submodule "lib/vendor/BntxSharp"]
+	path = lib/vendor/BntxSharp
+	url = https://github.com/BladesawStudios/BntxSharp
+[submodule "lib/vendor/ZstdSharp"]
+	path = lib/vendor/ZstdSharp
+	url = https://github.com/BladesawStudios/ZstdSharp
+[submodule "lib/vendor/TxtgSharp"]
+	path = lib/vendor/TxtgSharp
+	url = https://github.com/BladesawStudios/TxtgSharp
