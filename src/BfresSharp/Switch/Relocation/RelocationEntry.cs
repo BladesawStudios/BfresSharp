@@ -12,6 +12,8 @@ public readonly record struct RelocationEntry(uint Position, int StructCount, in
 
     public const int MaxOffsetCount = 255;
 
+    public const int MaxPaddingCount = 255;
+
     public const int MaxStructCount = ushort.MaxValue;
 
     public int StrideBytes => (OffsetCount + PaddingCount) * PointerSize;

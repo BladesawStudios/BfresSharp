@@ -32,6 +32,41 @@ public sealed class RelocationTableTests
     }
 
     [CorpusFact]
+    public void CorpusEntriesAreRebuiltFromTheirPointers()
+    {
+        int sections = 0;
+        var failures = new List<string>();
+        foreach (string folder in Corpus.Corpus.Folders)
+        {
+            foreach ((string name, byte[] data) in Corpus.Corpus.BfresFiles(folder))
+            {
+                if (!BfresHeaderReader.TryRead(data, out BfresHeader header) || !header.Platform.UsesSwitchLayout()) continue;
+                var view = new ByteView(data, ByteOrder.Little);
+                RelocationTable table = RelocationTable.Read(view, view.U32(0x18));
+                foreach (RelocationSection section in table.Sections)
+                {
+                    sections++;
+                    List<RelocationEntry> rebuilt = RelocationEncoder.Encode(section.Pointers().ToList());
+                    if (!rebuilt.SequenceEqual(section.Entries) && failures.Count < 12)
+                        failures.Add($"{name}: {Describe(section.Entries, rebuilt)}");
+                }
+            }
+        }
+
+        Assert.True(sections > 0);
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
+    }
+
+    private static string Describe(IReadOnlyList<RelocationEntry> expected, IReadOnlyList<RelocationEntry> actual)
+    {
+        int at = 0;
+        while (at < expected.Count && at < actual.Count && expected[at] == actual[at]) at++;
+        string e = at < expected.Count ? expected[at].ToString() : "end";
+        string a = at < actual.Count ? actual[at].ToString() : "end";
+        return $"entry {at} of {expected.Count}: expected {e}, rebuilt {a}";
+    }
+
+    [CorpusFact]
     public void CorpusTablesWriteBackIdentically()
     {
         var failures = new List<string>();
