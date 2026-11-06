@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BfresSharp</RootNamespace>
+    <AssemblyName>BfresSharp</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>Reader and writer for the Nintendo BFRES graphics archive format on Wii U and Switch.</Description>
+    <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="BfresSharp.Tests" />
+  </ItemGroup>
+
+</Project>
