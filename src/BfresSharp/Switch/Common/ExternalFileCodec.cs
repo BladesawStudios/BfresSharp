@@ -27,7 +27,8 @@ public static class ExternalFileCodec
         var slots = new int[files.Count];
         for (int index = 0; index < files.Count; index++)
         {
-            slots[index] = writer.Pointer();
+            // A file without bytes has no data to point at; version 9 and later still list the empty pointer.
+            slots[index] = files.Values[index].Data.Length == 0 && !writer.Profile.Modern ? writer.Unlisted() : writer.Pointer();
             writer.Out.U64((ulong)files.Values[index].Data.Length);
         }
 
@@ -37,8 +38,9 @@ public static class ExternalFileCodec
     // The alignment the relocation table gets after the data: a page, or less after a file too short to hold a header.
     public static int TailAlignment(ResDict<ExternalFile> files, int pageSize)
     {
-        if (files.Count == 0) return 8;
-        return files.Values[^1].Data.Length <= SmallFileLength ? SmallFileAlignment : pageSize;
+        ExternalFile? last = files.Values.LastOrDefault(file => file.Data.Length > 0);
+        if (last is null) return 8;
+        return last.Data.Length <= SmallFileLength ? SmallFileAlignment : pageSize;
     }
 
     // Places each file's data at the end of the archive; returns where the first file starts.
@@ -48,8 +50,9 @@ public static class ExternalFileCodec
         for (int index = 0; index < files.Count; index++)
         {
             byte[] data = files.Values[index].Data;
+            if (data.Length == 0) continue;
             writer.Align(data.Length <= SmallFileLength ? SmallFileAlignment : pageSize);
-            if (index == 0) start = writer.Position;
+            if (start == 0) start = writer.Position;
             writer.Resolve(slots[index]);
             writer.Out.Bytes(data);
         }
