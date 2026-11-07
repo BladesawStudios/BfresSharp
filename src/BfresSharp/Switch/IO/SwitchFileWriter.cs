@@ -24,9 +24,13 @@ public static class SwitchFileWriter
 
         if (file.SkeletalAnims.Count > 0) writer.Resolve(root.SkeletalAnims);
         var skeletal = file.SkeletalAnims.Values.Select(anim => SkeletalAnimCodec.WriteHeader(writer, anim)).ToList();
+        if (file.VisibilityAnims.Count > 0) writer.Resolve(root.VisibilityAnims);
+        var visibility = file.VisibilityAnims.Values.Select(anim => VisibilityAnimCodec.WriteHeader(writer, anim)).ToList();
         WriteBufferInfoPlaceholder(writer, file);
         WriteDictionary(writer, root.SkeletalAnimDict, file.SkeletalAnims);
+        WriteDictionary(writer, root.VisibilityAnimDict, file.VisibilityAnims);
         for (int index = 0; index < skeletal.Count; index++) SkeletalAnimCodec.WriteBody(writer, file.SkeletalAnims.Values[index], skeletal[index]);
+        for (int index = 0; index < visibility.Count; index++) VisibilityAnimCodec.WriteBody(writer, file.VisibilityAnims.Values[index], visibility[index]);
 
         int poolStart = WriteStringPool(writer, file, root);
         return Finish(writer, file, root, poolStart);
@@ -52,7 +56,11 @@ public static class SwitchFileWriter
 
         int skeletalArray = SectionArray(writer, file.SkeletalAnims.Count > 0);
         int skeletalDict = writer.Pointer();
-        for (int kind = 0; kind < 4; kind++)
+        SectionArray(writer, present: false);
+        writer.Pointer();
+        int visibilityArray = SectionArray(writer, file.VisibilityAnims.Count > 0);
+        int visibilityDict = writer.Pointer();
+        for (int kind = 0; kind < 2; kind++)
         {
             SectionArray(writer, present: false);
             writer.Pointer();
@@ -68,10 +76,10 @@ public static class SwitchFileWriter
         int poolSize = writer.Position;
         o.U32(0).U16(0);
         if (writer.Profile.Modern) o.U16(0).U16(0);
-        o.U16((ushort)file.SkeletalAnims.Count).U16(0).U16(0).U16(0).U16(0).U16(0);
+        o.U16((ushort)file.SkeletalAnims.Count).U16(0).U16((ushort)file.VisibilityAnims.Count).U16(0).U16(0).U16(0);
         if (writer.Profile.Modern) o.U8(file.ExternalFlags).U8(file.SavedFlags);
         else o.Zeros(6);
-        return new RootSlots(nameOffset, tableOffset, fileSize, skeletalArray, skeletalDict, stringTable, poolSize);
+        return new RootSlots(nameOffset, tableOffset, fileSize, skeletalArray, skeletalDict, visibilityArray, visibilityDict, stringTable, poolSize);
     }
 
     // Files before version 9 list an array pointer in the relocation table only when the array exists.
@@ -149,6 +157,8 @@ public static class SwitchFileWriter
         int FileSizeAt,
         int SkeletalAnims,
         int SkeletalAnimDict,
+        int VisibilityAnims,
+        int VisibilityAnimDict,
         int StringTable,
         int PoolSizeAt);
 }
