@@ -16,6 +16,7 @@ public static class VertexBufferCodec
     public const int AttribSize = 16;
     private const int RecordSize = 16;
     private const int BufferInfoWords = 9;
+    private const int StridePadding = 32;
 
     public static int Size(SwitchProfile profile) => profile.Modern ? 0x58 : 0x60;
 
@@ -56,9 +57,9 @@ public static class VertexBufferCodec
     {
         writer.Out.Bytes("FVTX"u8);
         if (writer.Profile.Modern) writer.Out.U32(buffer.Flags);
-        else writer.Block();
+        else writer.Out.Zeros(12);
         var slots = new Slots(writer.Pointer(), writer.Pointer(), 0, 0, 0, 0);
-        writer.Unlisted();
+        writer.PoolPointer();
         int unknown = writer.Pointer();
         int unknown2 = writer.Pointer();
         int size = writer.Pointer();
@@ -68,19 +69,20 @@ public static class VertexBufferCodec
         return slots with { Unknown = unknown, Unknown2 = unknown2, Sizes = size, Strides = stride };
     }
 
-    // The attribute records, the unused buffer info, the size and stride records and the attribute dictionary.
+    // The attribute records, the unused buffer info, the size and stride records, padding and the attribute dictionary.
     public static void WriteBody(SwitchWriter writer, VertexBuffer buffer, Slots slots)
     {
         writer.Align(8).Resolve(slots.Attributes);
         foreach (VertexAttrib attrib in buffer.Attributes.Values) WriteAttrib(writer, attrib);
         writer.Align(8).Resolve(slots.Unknown);
         writer.Out.Zeros(BufferInfoWords * 8 * buffer.Streams.Count);
-        writer.Align(8).Resolve(slots.Unknown2);
-        writer.Out.Zeros(BufferInfoWords * 8 * buffer.Streams.Count);
         writer.Align(8).Resolve(slots.Sizes);
         foreach (VertexStream stream in buffer.Streams) writer.Out.U32((uint)stream.Data.Length).U32(stream.GpuAccessFlags).Zeros(8);
         writer.Align(8).Resolve(slots.Strides);
         foreach (VertexStream stream in buffer.Streams) writer.Out.U32(stream.Stride).Zeros(12);
+        writer.Out.Zeros(StridePadding);
+        writer.Align(8).Resolve(slots.Unknown2);
+        writer.Out.Zeros(8 * buffer.Streams.Count);
         writer.Align(8).Resolve(slots.AttributeDict);
         SwitchDictCodec.Write(writer, buffer.Attributes);
     }

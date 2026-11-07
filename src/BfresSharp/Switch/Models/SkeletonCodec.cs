@@ -56,7 +56,7 @@ public static class SkeletonCodec
     // The bones, then the matrix lists, the mirror table, the bone dictionary and the user data of every bone.
     public static void WriteBody(SwitchWriter writer, Skeleton skeleton, Slots slots)
     {
-        writer.Align(8).Resolve(slots.BoneArray);
+        if (skeleton.Bones.Count > 0) writer.Align(8).Resolve(slots.BoneArray);
         var boneSlots = BoneCodec.WriteHeaders(writer, skeleton.Bones);
         WriteMatrixLists(writer, skeleton, slots);
         if (slots.Mirrored != 0)
@@ -66,11 +66,16 @@ public static class SkeletonCodec
             writer.Align(8);
         }
 
-        writer.Align(8).Resolve(slots.BoneDict);
-        SwitchDictCodec.Write(writer, skeleton.Bones);
+        if (skeleton.Bones.Count > 0)
+        {
+            writer.Align(8).Resolve(slots.BoneDict);
+            SwitchDictCodec.Write(writer, skeleton.Bones);
+        }
+
         WriteBoneUserData(writer, skeleton, boneSlots);
     }
 
+    // Both lists are pointed at even when empty, as the files do.
     private static void WriteMatrixLists(SwitchWriter writer, Skeleton skeleton, Slots slots)
     {
         writer.Align(8).Resolve(slots.MatrixToBone);
@@ -89,6 +94,7 @@ public static class SkeletonCodec
         for (int index = 0; index < skeleton.Bones.Count; index++)
         {
             var userData = skeleton.Bones.Values[index].UserData;
+            if (userData.Count == 0) continue;
             int[] valueSlots = UserDataCodec.WriteArray(writer, userData, boneSlots[index].Array);
             UserDataCodec.WriteDictAndValues(writer, userData, boneSlots[index].Dict, valueSlots);
         }

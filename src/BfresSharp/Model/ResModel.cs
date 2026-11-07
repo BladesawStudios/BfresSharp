@@ -15,6 +15,9 @@ public sealed class ResModel
 
     public uint Flags { get; set; }
 
+    // The vertex count the file states for the whole model; Switch files before version 9 keep it.
+    public uint TotalVertexCount { get; set; }
+
     public Skeleton.Skeleton Skeleton { get; set; } = new();
 
     public List<VertexBuffer> VertexBuffers { get; set; } = [];

@@ -43,10 +43,25 @@ public static class RenderInfoCodec
         return slot;
     }
 
-    public static void WriteValues(SwitchWriter writer, RenderInfo info, int slot)
+    // The values come after the records in three runs: all strings, then all integers, then all floats.
+    public static void WriteValues(SwitchWriter writer, IReadOnlyList<RenderInfo> infos, IReadOnlyList<int> slots)
     {
-        if (info.Count == 0) return;
-        writer.Align(8).Resolve(slot);
+        foreach (RenderInfoType type in new[] { RenderInfoType.String, RenderInfoType.Int32, RenderInfoType.Single })
+        {
+            for (int index = 0; index < infos.Count; index++)
+            {
+                RenderInfo info = infos[index];
+                if (info.Type != type || info.Count == 0) continue;
+                writer.Align(type == RenderInfoType.String ? 8 : 4).Resolve(slots[index]);
+                WriteValue(writer, info);
+            }
+        }
+
+        writer.Align(8);
+    }
+
+    private static void WriteValue(SwitchWriter writer, RenderInfo info)
+    {
         switch (info.Type)
         {
             case RenderInfoType.Int32: foreach (int value in info.Ints) writer.Out.U32((uint)value); break;

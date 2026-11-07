@@ -16,6 +16,7 @@ public static class MeshCodec
     public const int Size = 0x38;
     public const int SizeRecordLength = 16;
     private const int BufferInfoWords = 9;
+    private const int SizeRecordPadding = 32;
 
     private static readonly GX2PrimitiveType[] Primitives =
     [
@@ -52,7 +53,7 @@ public static class MeshCodec
     public static Slots WriteHeader(SwitchWriter writer, Mesh mesh, uint faceOffset)
     {
         var slots = new Slots(writer.Pointer(), 0, 0);
-        writer.Unlisted();
+        writer.PoolPointer();
         int unknown = writer.Pointer();
         int size = writer.Pointer();
         writer.Out.U32(faceOffset).U32((uint)Array.IndexOf(Primitives, mesh.PrimitiveType)).U32((uint)mesh.IndexFormat)
@@ -72,7 +73,7 @@ public static class MeshCodec
         writer.Align(8).Resolve(slots.Unknown);
         writer.Out.Zeros(BufferInfoWords * 8);
         writer.Resolve(slots.SizeRecord);
-        writer.Out.U32((uint)mesh.IndexData.Length).U32(mesh.BufferFlags).Zeros(8);
+        writer.Out.U32((uint)mesh.IndexData.Length).U32(mesh.BufferFlags).Zeros(8 + SizeRecordPadding);
     }
 
     public readonly record struct Slots(int SubMeshes, int Unknown, int SizeRecord);

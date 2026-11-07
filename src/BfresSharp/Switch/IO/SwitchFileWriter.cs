@@ -1,6 +1,7 @@
 using BfresSharp.Container;
 using BfresSharp.Model;
 using BfresSharp.Switch.Animation;
+using BfresSharp.Switch.Models;
 using BfresSharp.Switch.Relocation;
 
 namespace BfresSharp.Switch.IO;
@@ -8,35 +9,41 @@ namespace BfresSharp.Switch.IO;
 /// <summary>Writes a <see cref="ResFile"/> as a Switch BFRES file.</summary>
 /// <remarks>
 /// Lays the file out in the order the game's tools do: the header, the arrays of section headers, the dictionaries,
-/// what each section points to, the name pool, and the relocation table last. Pointer fields are recorded as they are
-/// written, so the relocation table and every size and offset in the header come from the layout itself.
+/// what each section points to, the name pool, the buffer data, the memory pool and the relocation table last. Pointer
+/// fields are recorded as they are written, so the relocation table and every size and offset in the header come from
+/// the layout itself.
 /// </remarks>
 public static class SwitchFileWriter
 {
     private const int BufferInfoSize = 0x20;
-    private const int FlagOffset = 0x14;
     private const int BlockOffsetField = 0x16;
+    private const int MemoryPoolSize = 288;
 
     public static byte[] Write(ResFile file)
     {
         var writer = new SwitchWriter(SwitchProfile.For(file.Version));
-        RootSlots root = WriteHeader(writer, file);
+        var layout = new SwitchBufferLayout(file);
+        RootSlots root = WriteHeader(writer, file, layout);
 
+        if (file.Models.Count > 0) writer.Resolve(root.Models);
+        var models = file.Models.Values.Select(model => ModelCodec.WriteHeader(writer, model)).ToList();
         if (file.SkeletalAnims.Count > 0) writer.Resolve(root.SkeletalAnims);
         var skeletal = file.SkeletalAnims.Values.Select(anim => SkeletalAnimCodec.WriteHeader(writer, anim)).ToList();
         if (file.VisibilityAnims.Count > 0) writer.Resolve(root.VisibilityAnims);
         var visibility = file.VisibilityAnims.Values.Select(anim => VisibilityAnimCodec.WriteHeader(writer, anim)).ToList();
-        WriteBufferInfoPlaceholder(writer, file);
+        int bufferData = WriteBufferInfo(writer, root, layout);
+        WriteDictionary(writer, root.ModelDict, file.Models);
         WriteDictionary(writer, root.SkeletalAnimDict, file.SkeletalAnims);
         WriteDictionary(writer, root.VisibilityAnimDict, file.VisibilityAnims);
+        for (int index = 0; index < models.Count; index++) ModelCodec.WriteBody(writer, file.Models.Values[index], models[index], layout);
         for (int index = 0; index < skeletal.Count; index++) SkeletalAnimCodec.WriteBody(writer, file.SkeletalAnims.Values[index], skeletal[index]);
         for (int index = 0; index < visibility.Count; index++) VisibilityAnimCodec.WriteBody(writer, file.VisibilityAnims.Values[index], visibility[index]);
 
         int poolStart = WriteStringPool(writer, file, root);
-        return Finish(writer, file, root, poolStart);
+        return Finish(writer, file, root, layout, bufferData);
     }
 
-    private static RootSlots WriteHeader(SwitchWriter writer, ResFile file)
+    private static RootSlots WriteHeader(SwitchWriter writer, ResFile file, SwitchBufferLayout layout)
     {
         var o = writer.Out;
         o.Bytes("FRES    "u8).U32(file.Version.Raw).U16(0xFEFF).U8(file.Alignment).U8(file.TargetAddressSize);
@@ -47,8 +54,8 @@ public static class SwitchFileWriter
         int fileSize = writer.Position;
         o.U32(0);
         writer.StringPointer(file.Name);
-        SectionArray(writer, present: false);
-        writer.Pointer();
+        int modelArray = SectionArray(writer, file.Models.Count > 0);
+        int modelDict = writer.Pointer();
         if (writer.Profile.Modern)
         {
             for (int word = 0; word < 4; word++) writer.Unlisted(BitConverter.ToUInt64(file.Reserved, word * 8));
@@ -66,20 +73,21 @@ public static class SwitchFileWriter
             writer.Pointer();
         }
 
-        if (writer.Profile.Modern && file.Platform != BfresPlatform.Switch2) writer.Pointer();
+        if (!layout.IsEmpty) writer.PoolPointer();
+        else if (writer.Profile.Modern && file.Platform != BfresPlatform.Switch2) writer.Pointer();
         else writer.Unlisted();
-        writer.Unlisted();
+        int bufferInfo = layout.IsEmpty ? writer.Unlisted() : writer.Pointer();
         SectionArray(writer, present: false);
         writer.Pointer();
         writer.Unlisted();
         int stringTable = writer.Pointer();
         int poolSize = writer.Position;
-        o.U32(0).U16(0);
+        o.U32(0).U16((ushort)file.Models.Count);
         if (writer.Profile.Modern) o.U16(0).U16(0);
         o.U16((ushort)file.SkeletalAnims.Count).U16(0).U16((ushort)file.VisibilityAnims.Count).U16(0).U16(0).U16(0);
         if (writer.Profile.Modern) o.U8(file.ExternalFlags).U8(file.SavedFlags);
         else o.Zeros(6);
-        return new RootSlots(nameOffset, tableOffset, fileSize, skeletalArray, skeletalDict, visibilityArray, visibilityDict, stringTable, poolSize);
+        return new RootSlots(nameOffset, tableOffset, fileSize, modelArray, modelDict, skeletalArray, skeletalDict, visibilityArray, visibilityDict, bufferInfo, stringTable, poolSize);
     }
 
     // Files before version 9 list an array pointer in the relocation table only when the array exists.
@@ -96,10 +104,19 @@ public static class SwitchFileWriter
     }
 
     // A file without buffers still carries an empty buffer info block; the header does not point at it.
-    private static void WriteBufferInfoPlaceholder(SwitchWriter writer, ResFile file)
+    private static int WriteBufferInfo(SwitchWriter writer, RootSlots root, SwitchBufferLayout layout)
     {
-        if (writer.Profile.Modern) return;
-        writer.Out.U32(0x22).Zeros(BufferInfoSize - 4);
+        if (layout.IsEmpty)
+        {
+            if (!writer.Profile.Modern) writer.Out.U32(0x22).Zeros(BufferInfoSize - 4);
+            return 0;
+        }
+
+        writer.Resolve(root.BufferInfo);
+        writer.Out.U32(0x22).U32((uint)layout.TotalSize);
+        int slot = writer.Pointer();
+        writer.Out.Zeros(BufferInfoSize - 16);
+        return slot;
     }
 
     private static int WriteStringPool(SwitchWriter writer, ResFile file, RootSlots root)
@@ -116,27 +133,74 @@ public static class SwitchFileWriter
         return start;
     }
 
-    private static byte[] Finish(SwitchWriter writer, ResFile file, RootSlots root, int poolStart)
+    private static byte[] Finish(SwitchWriter writer, ResFile file, RootSlots root, SwitchBufferLayout layout, int bufferData)
     {
         int stringEnd = writer.Position;
+        long bufferBase = 0, poolAt = 0;
+        if (!layout.IsEmpty)
+        {
+            writer.Align(SwitchBufferLayout.PageSize);
+            bufferBase = writer.Position;
+            writer.Out.Bytes(layout.Build());
+            poolAt = writer.Position;
+            writer.Out.Zeros(MemoryPoolSize);
+            ResolveBuffers(writer, bufferData, bufferBase, poolAt);
+        }
+
         writer.Align(8);
         int tableAt = writer.Position;
-        var sections = new List<RelocationSection>
-        {
-            new(0, (uint)stringEnd, [.. RelocationEncoder.Encode(writer.Pointers.Order().ToList())]),
-        };
-        int emptySections = file.Platform == BfresPlatform.Switch2 ? 5 : 4;
-        for (int unused = 0; unused < emptySections; unused++) sections.Add(new RelocationSection((uint)stringEnd, 0, []));
+        var sections = BuildSections(writer, file, layout, stringEnd, bufferBase, poolAt);
         writer.Out.Bytes(new RelocationTable(sections).ToBytes((uint)tableAt));
 
-        PatchBlocks(writer, file, tableAt);
+        PatchBlocks(writer, tableAt);
         writer.Out.SetU32(root.TableOffsetAt, (uint)tableAt);
         writer.Out.SetU32(root.FileSizeAt, (uint)writer.Position);
         return writer.Out.ToArray();
     }
 
+    private static void ResolveBuffers(SwitchWriter writer, int bufferData, long bufferBase, long poolAt)
+    {
+        foreach (int slot in writer.PoolSlots) writer.ResolveTo(slot, poolAt);
+        writer.ResolveTo(bufferData, bufferBase);
+    }
+
+    // Each pointer goes in the section its target lies in: the main data, the index data, the vertex data or the pool.
+    private static List<RelocationSection> BuildSections(SwitchWriter writer, ResFile file, SwitchBufferLayout layout, int stringEnd, long bufferBase, long poolAt)
+    {
+        var groups = new List<long>[4].Select(_ => new List<long>()).ToArray();
+        foreach (long slot in writer.Pointers.Order())
+        {
+            long target = (long)BitConverter.ToUInt64(writer.Out.Written[(int)slot..((int)slot + 8)]);
+            groups[SectionOf(target, layout, bufferBase, poolAt)].Add(slot);
+        }
+
+        long indexEnd = bufferBase + layout.IndexSize;
+        long poolEnd = poolAt + MemoryPoolSize;
+        var sections = new List<RelocationSection> { new(0, (uint)stringEnd, [.. RelocationEncoder.Encode(groups[0])]) };
+        if (layout.IsEmpty)
+        {
+            int empty = file.Platform == BfresPlatform.Switch2 ? 5 : 4;
+            for (int unused = 0; unused < empty; unused++) sections.Add(new RelocationSection((uint)stringEnd, 0, []));
+            return sections;
+        }
+
+        sections.Add(new RelocationSection((uint)bufferBase, (uint)layout.IndexSize, [.. RelocationEncoder.Encode(groups[1])]));
+        sections.Add(new RelocationSection((uint)indexEnd, (uint)(layout.TotalSize - layout.IndexSize), [.. RelocationEncoder.Encode(groups[2])]));
+        sections.Add(new RelocationSection((uint)poolAt, MemoryPoolSize, [.. RelocationEncoder.Encode(groups[3])]));
+        sections.Add(new RelocationSection((uint)poolEnd, 0, []));
+        if (file.Platform == BfresPlatform.Switch2) sections.Add(new RelocationSection((uint)poolEnd, 0, []));
+        return sections;
+    }
+
+    private static int SectionOf(long target, SwitchBufferLayout layout, long bufferBase, long poolAt)
+    {
+        if (layout.IsEmpty || target < bufferBase) return 0;
+        if (target >= poolAt) return 3;
+        return target < bufferBase + layout.IndexSize ? 1 : 2;
+    }
+
     // Chains the linked header blocks: each holds the distance to the next, the last the distance to the relocation table.
-    private static void PatchBlocks(SwitchWriter writer, ResFile file, int tableAt)
+    private static void PatchBlocks(SwitchWriter writer, int tableAt)
     {
         List<int> blocks = writer.BlockPositions;
         writer.Out.SetU16(BlockOffsetField, (ushort)(blocks[0] - 4));
@@ -147,18 +211,19 @@ public static class SwitchFileWriter
             writer.Out.SetU32(blocks[index], last ? 0 : distance);
             writer.Out.SetU64(blocks[index] + 4, distance);
         }
-
-        _ = file;
     }
 
     private sealed record RootSlots(
         int NameOffsetAt,
         int TableOffsetAt,
         int FileSizeAt,
+        int Models,
+        int ModelDict,
         int SkeletalAnims,
         int SkeletalAnimDict,
         int VisibilityAnims,
         int VisibilityAnimDict,
+        int BufferInfo,
         int StringTable,
         int PoolSizeAt);
 }

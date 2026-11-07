@@ -49,16 +49,66 @@ public static class ShapeCodec
         var profile = writer.Profile;
         writer.Out.Bytes("FSHP"u8);
         if (profile.Modern) writer.Out.U32(shape.Flags);
-        else writer.Block();
+        else writer.Out.Zeros(12);
         writer.StringPointer(shape.Name);
         writer.Pointer(vertexBuffer);
-        var slots = new Slots(writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer());
+        int meshes = writer.Pointer();
+        int skin = writer.Pointer();
+        bool keys = shape.KeyShapes.Count > 0;
+        int keyArray = keys ? writer.Pointer() : writer.Unlisted();
+        int keyDict = keys ? writer.Pointer() : writer.Unlisted();
+        var slots = new Slots(meshes, skin, keyArray, keyDict, writer.Pointer(), writer.Pointer());
         writer.Unlisted();
         if (!profile.Modern) writer.Out.U32(shape.Flags);
         writer.Out.U16((ushort)index).U16(shape.MaterialIndex).U16(shape.BoneIndex).U16(shape.VertexBufferIndex)
             .U16((ushort)shape.SkinBoneIndices.Count).U8(shape.VertexSkinCount).U8((byte)shape.Meshes.Count)
             .U8((byte)shape.KeyShapes.Count).U8(shape.TargetAttribCount).Zeros(profile.Modern ? 2 : 6);
         return slots;
+    }
+
+    // The mesh headers, skin bone indices, bounding boxes, key shapes, radii and then each mesh's own records.
+    public static void WriteBody(SwitchWriter writer, Shape shape, Slots slots, SwitchBufferLayout layout)
+    {
+        if (shape.Meshes.Count > 0) writer.Align(8).Resolve(slots.Meshes);
+        var meshSlots = shape.Meshes.Select(mesh => MeshCodec.WriteHeader(writer, mesh, layout.FaceOffset(mesh))).ToList();
+        writer.Align(8).Resolve(slots.SkinBoneIndices);
+        foreach (ushort index in shape.SkinBoneIndices) writer.Out.U16(index);
+
+        if (shape.SubMeshBoundings.Count > 0)
+        {
+            writer.Align(8).Resolve(slots.Boundings);
+            foreach (Bounding box in shape.SubMeshBoundings) WriteBounding(writer, box);
+        }
+
+        WriteKeyShapes(writer, shape, slots);
+        WriteRadii(writer, shape, slots);
+        for (int index = 0; index < shape.Meshes.Count; index++)
+        {
+            MeshCodec.WriteSubMeshes(writer, shape.Meshes[index], meshSlots[index]);
+            MeshCodec.WriteBufferRecords(writer, shape.Meshes[index], meshSlots[index]);
+        }
+    }
+
+    private static void WriteKeyShapes(SwitchWriter writer, Shape shape, Slots slots)
+    {
+        if (shape.KeyShapes.Count == 0) return;
+        writer.Align(8).Resolve(slots.KeyShapes);
+        foreach (KeyShape key in shape.KeyShapes.Values) writer.Out.Bytes(key.TargetAttribIndices).Bytes(key.TargetAttribIndexOffsets);
+        writer.Align(8).Resolve(slots.KeyShapeDict);
+        SwitchDictCodec.Write(writer, shape.KeyShapes);
+    }
+
+    private static void WriteRadii(SwitchWriter writer, Shape shape, Slots slots)
+    {
+        if (shape.Radii.Count == 0 && shape.BoundingRadii.Count == 0) return;
+        writer.Align(8).Resolve(slots.Radii);
+        foreach (float radius in shape.Radii) writer.Out.F32(radius);
+        foreach (Vector4 radius in shape.BoundingRadii) writer.Out.F32(radius.X).F32(radius.Y).F32(radius.Z).F32(radius.W);
+    }
+
+    private static void WriteBounding(SwitchWriter writer, Bounding box)
+    {
+        writer.Out.F32(box.Center.X).F32(box.Center.Y).F32(box.Center.Z).F32(box.Extent.X).F32(box.Extent.Y).F32(box.Extent.Z);
     }
 
     private static void ReadBoundings(SwitchReader reader, Shape shape, long fields)

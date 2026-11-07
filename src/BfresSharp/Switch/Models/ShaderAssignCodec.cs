@@ -37,11 +37,15 @@ public static class ShaderAssignCodec
         return slots;
     }
 
+    // The three value arrays come first and then the three dictionaries.
     public static void WriteBody(SwitchWriter writer, ShaderAssign assign, Slots slots)
     {
-        WriteStrings(writer, assign.AttribAssigns, slots.Attribs, slots.AttribDict);
-        WriteStrings(writer, assign.SamplerAssigns, slots.Samplers, slots.SamplerDict);
-        WriteStrings(writer, assign.ShaderOptions, slots.Options, slots.OptionDict);
+        WriteValues(writer, assign.AttribAssigns, slots.Attribs);
+        WriteValues(writer, assign.SamplerAssigns, slots.Samplers);
+        WriteValues(writer, assign.ShaderOptions, slots.Options);
+        WriteDictionary(writer, assign.AttribAssigns, slots.AttribDict);
+        WriteDictionary(writer, assign.SamplerAssigns, slots.SamplerDict);
+        WriteDictionary(writer, assign.ShaderOptions, slots.OptionDict);
     }
 
     private static ResDict<string> ReadStrings(SwitchReader reader, long dictAt, long arrayAt)
@@ -49,11 +53,16 @@ public static class ShaderAssignCodec
         return reader.ReadDict(dictAt, arrayAt, 8, offset => reader.String(offset) ?? "");
     }
 
-    private static void WriteStrings(SwitchWriter writer, ResDict<string> values, int arraySlot, int dictSlot)
+    private static void WriteValues(SwitchWriter writer, ResDict<string> values, int arraySlot)
     {
         if (values.Count == 0) return;
         writer.Align(8).Resolve(arraySlot);
         foreach (string value in values.Values) writer.StringPointer(value);
+    }
+
+    private static void WriteDictionary(SwitchWriter writer, ResDict<string> values, int dictSlot)
+    {
+        if (values.Count == 0) return;
         writer.Align(8).Resolve(dictSlot);
         SwitchDictCodec.Write(writer, values);
     }

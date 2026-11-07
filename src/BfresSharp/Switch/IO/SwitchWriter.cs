@@ -62,6 +62,16 @@ public sealed class SwitchWriter(SwitchProfile profile)
 
     public void ResolveTo(int slot, long target) => Out.SetU64(slot, (ulong)target);
 
+    // Slots that point at the memory pool, which is placed after everything else.
+    public List<int> PoolSlots { get; } = [];
+
+    public int PoolPointer()
+    {
+        int slot = Pointer();
+        PoolSlots.Add(slot);
+        return slot;
+    }
+
     // A pointer field that holds no pointer and is not listed in the relocation table.
     public int Unlisted(ulong value = 0)
     {

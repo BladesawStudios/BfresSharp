@@ -14,6 +14,8 @@ namespace BfresSharp.Switch.Models;
 /// </remarks>
 public static class MaterialCodec
 {
+    private const int SamplerRuntimeLongs = 15;
+
     public static int Size(SwitchProfile profile) => profile.Modern ? 0xA8 : 0xB8;
 
     public static Material Read(SwitchReader reader, long at)
@@ -73,6 +75,90 @@ public static class MaterialCodec
             .U16((ushort)material.ShaderParamData.Length).U16(0).U16((ushort)material.UserData.Count);
         if (!profile.Modern) writer.Out.U32(0);
         return slots;
+    }
+
+    // The render infos and their values, the zeroed runtime tables, samplers, parameters, slots and names, the shader
+    // assignment, then the dictionaries and user data values.
+    public static void WriteBody(SwitchWriter writer, Material material, Slots slots)
+    {
+        var valueSlots = WriteRenderInfos(writer, material, slots);
+        if (valueSlots.Count > 0) RenderInfoCodec.WriteValues(writer, material.RenderInfos.Values, valueSlots);
+        WriteZeros(writer, slots.TextureUnknown, material.TextureRefs.Count * 8);
+        WriteSamplers(writer, material, slots);
+        WriteParams(writer, material, slots);
+        if (material.VolatileFlags.Length > 0)
+        {
+            writer.Align(8).Resolve(slots.Volatile);
+            writer.Out.Bytes(material.VolatileFlags);
+        }
+
+        int[] userSlots = UserDataCodec.WriteArray(writer, material.UserData, slots.UserArray);
+        WriteSlots(writer, material.SamplerSlots, slots.SamplerSlots);
+        WriteSlots(writer, material.TextureSlots, slots.TextureSlots);
+        WriteTextures(writer, material, slots);
+        writer.Align(8).Resolve(slots.ShaderAssign);
+        var assignSlots = ShaderAssignCodec.WriteHeader(writer, material.ShaderAssign);
+        ShaderAssignCodec.WriteBody(writer, material.ShaderAssign, assignSlots);
+        WriteDictionary(writer, slots.RenderInfoDict, material.RenderInfos);
+        WriteDictionary(writer, slots.SamplerDict, material.Samplers);
+        WriteDictionary(writer, slots.ParamDict, material.ShaderParams);
+        UserDataCodec.WriteDictAndValues(writer, material.UserData, slots.UserDict, userSlots);
+    }
+
+    private static List<int> WriteRenderInfos(SwitchWriter writer, Material material, Slots slots)
+    {
+        if (material.RenderInfos.Count == 0) return [];
+        writer.Align(8).Resolve(slots.RenderInfos);
+        return material.RenderInfos.Values.Select(info => RenderInfoCodec.WriteRecord(writer, info)).ToList();
+    }
+
+    private static void WriteDictionary<T>(SwitchWriter writer, int slot, ResDict<T> dict)
+    {
+        if (dict.Count == 0) return;
+        writer.Align(8).Resolve(slot);
+        SwitchDictCodec.Write(writer, dict);
+    }
+
+    private static void WriteZeros(SwitchWriter writer, int slot, int length)
+    {
+        if (length == 0) return;
+        writer.Align(8).Resolve(slot);
+        writer.Out.Zeros(length);
+    }
+
+    private static void WriteTextures(SwitchWriter writer, Material material, Slots slots)
+    {
+        if (material.TextureRefs.Count == 0) return;
+        writer.Align(8).Resolve(slots.TextureNames);
+        foreach (string name in material.TextureRefs) writer.StringPointer(name);
+    }
+
+    private static void WriteSamplers(SwitchWriter writer, Material material, Slots slots)
+    {
+        if (material.Samplers.Count == 0) return;
+        writer.Align(8).Resolve(slots.Samplers);
+        foreach (Sampler sampler in material.Samplers.Values) SamplerCodec.Write(writer, sampler);
+        WriteZeros(writer, slots.SamplerUnknown, material.Samplers.Count * SamplerRuntimeLongs * 8);
+    }
+
+    private static void WriteParams(SwitchWriter writer, Material material, Slots slots)
+    {
+        if (material.ShaderParams.Count > 0)
+        {
+            writer.Align(8).Resolve(slots.Params);
+            foreach (ShaderParam param in material.ShaderParams.Values) ShaderParamCodec.Write(writer, param);
+        }
+
+        if (material.ShaderParamData.Length == 0) return;
+        writer.Align(8).Resolve(slots.ParamData);
+        writer.Out.Bytes(material.ShaderParamData);
+    }
+
+    private static void WriteSlots(SwitchWriter writer, long[] values, int slot)
+    {
+        if (values.Length == 0) return;
+        writer.Align(8).Resolve(slot);
+        foreach (long value in values) writer.Out.U64((ulong)value);
     }
 
     public readonly record struct Slots
