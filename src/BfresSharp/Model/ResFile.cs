@@ -33,6 +33,8 @@ public sealed class ResFile
     // The names in the order the file's name pool held them, so a file writes its pool back in the same order.
     public List<string> StringOrder { get; set; } = [];
 
+    public ResDict<ResModel> Models { get; set; } = new();
+
     public ResDict<SkeletalAnim> SkeletalAnims { get; set; } = new();
 
     public ResDict<VisibilityAnim> VisibilityAnims { get; set; } = new();
