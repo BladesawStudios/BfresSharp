@@ -4,7 +4,8 @@ namespace BfresSharp.Gx2.Addressing;
 /// <remarks>
 /// Pitch and height are in elements: pixels, or 4x4 blocks for block compressed formats. Depth is the slice count after
 /// padding, Size the bytes of the whole level (every slice) and BitsPerElement the bits of one element. The tile mode is
-/// the one the level is stored in, which can differ from the surface's mode for small mip levels.
+/// the one the level is stored in, which can differ from the surface's mode for small mip levels. ElementsWide and
+/// ElementsHigh are the unpadded size of the picture in elements, the part of the pitch and height that holds pixels.
 /// </remarks>
 public readonly record struct Gx2LevelInfo(
     uint Pitch,
@@ -16,4 +17,7 @@ public readonly record struct Gx2LevelInfo(
     uint HeightAlign,
     uint DepthAlign,
     uint TileMode,
-    uint BitsPerElement);
+    uint BitsPerElement,
+    uint Samples = 1,
+    uint ElementsWide = 0,
+    uint ElementsHigh = 0);

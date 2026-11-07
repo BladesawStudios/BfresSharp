@@ -22,16 +22,19 @@ public static class Gx2SurfaceLayout
         (uint levelHeight, uint slices, bool cube) = Dimensions(dim, height, depth, mip);
         uint levelWidth = Math.Max(1, width >> level);
         if (tileMode == GX2TileMode.LinearSpecial) return Special(hardware, levelWidth, levelHeight, slices, samples);
+        bool blocks = elementMode is >= 9 and <= 13;
+        uint pictureWidth = blocks ? (levelWidth + 3) / 4 : levelWidth;
+        uint pictureHeight = blocks ? (levelHeight + 3) / 4 : levelHeight;
 
         uint mode = (uint)tileMode & 0x0F;
-        if (elementMode is >= 9 and <= 13) (levelWidth, levelHeight) = BlockCompressedSize(levelWidth, levelHeight, mip);
+        if (blocks) (levelWidth, levelHeight) = BlockCompressedSize(levelWidth, levelHeight, mip);
 
         bool threeByte = elementMode == 4 && expandX == 3 && mode == Gx2TileModes.LinearAligned;
         (levelWidth, levelHeight, uint bpp) = Expand(elementMode, expandX, expandY, elementBits, levelWidth, levelHeight);
         uint sizeMode = Gx2MipTileMode.Choose(mode, bpp, mip, levelWidth, levelHeight, slices, samples);
         uint padDims = cube && mip == 0 ? 2u : 0u;
         var request = new Gx2SizeRequest(sizeMode, mode, bpp, samples, levelWidth, levelHeight, slices, mip, padDims, cube, threeByte);
-        return Gx2LevelSizer.Size(request) with { BitsPerElement = bpp };
+        return Gx2LevelSizer.Size(request) with { BitsPerElement = bpp, Samples = samples, ElementsWide = pictureWidth, ElementsHigh = pictureHeight };
     }
 
     // Block compressed levels are rounded to whole blocks at the first level and to powers of two below it.
@@ -99,6 +102,6 @@ public static class Gx2SurfaceLayout
         uint pitch = Gx2Alignments.AlignPow2(width, block) / block;
         uint rows = Gx2Alignments.AlignPow2(height, block) / block;
         uint size = bits * samples * slices * rows * pitch >> 3;
-        return new Gx2LevelInfo(pitch, rows, slices, size, 1, 1, 1, 1, Gx2TileModes.LinearGeneral, bits);
+        return new Gx2LevelInfo(pitch, rows, slices, size, 1, 1, 1, 1, Gx2TileModes.LinearGeneral, bits, samples, (width + block - 1) / block, (height + block - 1) / block);
     }
 }
