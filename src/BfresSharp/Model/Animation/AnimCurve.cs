@@ -3,8 +3,8 @@ namespace BfresSharp.Model.Animation;
 /// <summary>A curve of keyed values over frames that drives one animated value.</summary>
 /// <remarks>
 /// The flags word packs the frame type, key type, curve type and wrap modes; the properties read and write the
-/// bits they own. Float curves keep their keys in <see cref="Keys"/> as one row per key (four coefficients for
-/// cubic, two for linear, one otherwise). Integer step curves keep <see cref="IntKeys"/> and boolean step curves keep
+/// bits they own. Float curves keep their keys in <see cref="Keys"/>, key after key, each holding four coefficients for
+/// cubic, two for linear and one otherwise. Integer step curves keep <see cref="IntKeys"/> and boolean step curves keep
 /// <see cref="BoolKeys"/>, so no value passes through a float. A curve with the compressed flag, which Switch 2 files
 /// use, keeps its key bytes untouched in <see cref="CompressedKeyData"/> so it writes back exactly.
 /// </remarks>
@@ -12,7 +12,6 @@ public sealed class AnimCurve
 {
     public const ushort CompressedFlag = 0x4000;
 
-    private static readonly float[,] NoKeys = new float[0, 0];
     private const ushort FrameTypeMask = 0b11;
     private const ushort KeyTypeMask = 0b1100;
     private const ushort CurveTypeMask = 0b111_0000;
@@ -68,7 +67,7 @@ public sealed class AnimCurve
 
     public float[] Frames { get; set; } = [];
 
-    public float[,] Keys { get; set; } = NoKeys;
+    public float[] Keys { get; set; } = [];
 
     public int[] IntKeys { get; set; } = [];
 

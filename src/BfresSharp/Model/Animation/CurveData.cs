@@ -54,13 +54,9 @@ public static class CurveData
         }
 
         int perKey = curve.ElementsPerKey;
-        curve.Keys = new float[count, perKey];
+        curve.Keys = new float[count * perKey];
         int width = KeyWidth(curve.KeyType);
-        for (int key = 0; key < count; key++)
-        {
-            for (int element = 0; element < perKey; element++)
-                curve.Keys[key, element] = ReadKey(view, curve.KeyType, at + ((long)key * perKey + element) * width);
-        }
+        for (int index = 0; index < curve.Keys.Length; index++) curve.Keys[index] = ReadKey(view, curve.KeyType, at + (long)index * width);
     }
 
     private static float ReadKey(ByteView view, AnimCurveKeyType type, long at)
