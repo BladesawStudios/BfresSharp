@@ -45,4 +45,6 @@ public sealed class ResFile
     public ResDict<MaterialAnim> MaterialAnims { get; set; } = new();
 
     public ResDict<VisibilityAnim> VisibilityAnims { get; set; } = new();
+
+    public ResDict<ShapeAnim> ShapeAnims { get; set; } = new();
 }

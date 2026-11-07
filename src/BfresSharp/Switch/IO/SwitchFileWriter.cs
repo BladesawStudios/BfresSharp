@@ -33,6 +33,8 @@ public static class SwitchFileWriter
         var material = file.MaterialAnims.Values.Select(anim => MaterialAnimCodec.WriteHeader(writer, anim)).ToList();
         if (file.VisibilityAnims.Count > 0) writer.Resolve(root.VisibilityAnims);
         var visibility = file.VisibilityAnims.Values.Select(anim => VisibilityAnimCodec.WriteHeader(writer, anim)).ToList();
+        if (file.ShapeAnims.Count > 0) writer.Resolve(root.ShapeAnims);
+        var shapes = file.ShapeAnims.Values.Select(anim => ShapeAnimCodec.WriteHeader(writer, anim)).ToList();
         int bufferData = WriteBufferInfo(writer, root, layout, file, models);
         if (file.ExternalFiles.Count > 0) writer.Align(8).Resolve(root.ExternalFiles);
         int[] externalSlots = ExternalFileCodec.WriteEntries(writer, file.ExternalFiles);
@@ -40,10 +42,12 @@ public static class SwitchFileWriter
         WriteDictionary(writer, root.SkeletalAnimDict, file.SkeletalAnims);
         WriteDictionary(writer, root.MaterialAnimDict, file.MaterialAnims);
         WriteDictionary(writer, root.VisibilityAnimDict, file.VisibilityAnims);
+        WriteDictionary(writer, root.ShapeAnimDict, file.ShapeAnims);
         WriteDictionary(writer, root.ExternalFileDict, file.ExternalFiles);
         for (int index = 0; index < models.Count; index++) ModelCodec.WriteBody(writer, file.Models.Values[index], models[index], layout);
         for (int index = 0; index < skeletal.Count; index++) SkeletalAnimCodec.WriteBody(writer, file.SkeletalAnims.Values[index], skeletal[index]);
         for (int index = 0; index < visibility.Count; index++) VisibilityAnimCodec.WriteBody(writer, file.VisibilityAnims.Values[index], visibility[index]);
+        for (int index = 0; index < shapes.Count; index++) ShapeAnimCodec.WriteBody(writer, file.ShapeAnims.Values[index], shapes[index]);
         for (int index = 0; index < material.Count; index++) MaterialAnimCodec.WriteBody(writer, file.MaterialAnims.Values[index], material[index]);
 
         int poolStart = WriteStringPool(writer, file, root);
@@ -74,11 +78,10 @@ public static class SwitchFileWriter
         int materialDict = writer.Pointer();
         int visibilityArray = SectionArray(writer, file.VisibilityAnims.Count > 0);
         int visibilityDict = writer.Pointer();
-        for (int kind = 0; kind < 2; kind++)
-        {
-            SectionArray(writer, present: false);
-            writer.Pointer();
-        }
+        int shapeArray = SectionArray(writer, file.ShapeAnims.Count > 0);
+        int shapeDict = writer.Pointer();
+        SectionArray(writer, present: false);
+        writer.Pointer();
 
         if (!layout.IsEmpty) writer.PoolPointer();
         else if (writer.Profile.Modern && file.Platform != BfresPlatform.Switch2) writer.Pointer();
@@ -91,10 +94,10 @@ public static class SwitchFileWriter
         int poolSize = writer.Position;
         o.U32(0).U16((ushort)file.Models.Count);
         if (writer.Profile.Modern) o.U16(0).U16(0);
-        o.U16((ushort)file.SkeletalAnims.Count).U16((ushort)file.MaterialAnims.Count).U16((ushort)file.VisibilityAnims.Count).U16(0).U16(0).U16((ushort)file.ExternalFiles.Count);
+        o.U16((ushort)file.SkeletalAnims.Count).U16((ushort)file.MaterialAnims.Count).U16((ushort)file.VisibilityAnims.Count).U16((ushort)file.ShapeAnims.Count).U16(0).U16((ushort)file.ExternalFiles.Count);
         if (writer.Profile.Modern) o.U8(file.ExternalFlags).U8(file.SavedFlags);
         else o.Zeros(6);
-        return new RootSlots(nameOffset, tableOffset, fileSize, modelArray, modelDict, skeletalArray, skeletalDict, materialArray, materialDict, visibilityArray, visibilityDict, bufferInfo, externalArray, externalDict, stringTable, poolSize);
+        return new RootSlots(nameOffset, tableOffset, fileSize, modelArray, modelDict, skeletalArray, skeletalDict, materialArray, materialDict, visibilityArray, visibilityDict, shapeArray, shapeDict, bufferInfo, externalArray, externalDict, stringTable, poolSize);
     }
 
     // Files before version 9 list an array pointer in the relocation table only when the array exists.
@@ -210,6 +213,8 @@ public static class SwitchFileWriter
         int MaterialAnimDict,
         int VisibilityAnims,
         int VisibilityAnimDict,
+        int ShapeAnims,
+        int ShapeAnimDict,
         int BufferInfo,
         int ExternalFiles,
         int ExternalFileDict,
