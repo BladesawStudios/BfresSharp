@@ -66,7 +66,7 @@ public static class VertexBufferCodec
         {
             Stride = view.U16(at + 0xC),
             BufferCount = view.U16(at + 0xE),
-            Data = data == 0 ? [] : reader.Bytes(data, (long)size * copies),
+            Data = data == 0 ? default : reader.Slice(data, (long)size * copies),
         };
     }
 
@@ -74,6 +74,6 @@ public static class VertexBufferCodec
     {
         int copies = Math.Max((int)stream.BufferCount, 1);
         writer.Out.U32(0).U32((uint)(stream.Data.Length / copies)).U32(0).U16(stream.Stride).U16(stream.BufferCount).U32(0);
-        writer.Block(stream.Data.Length == 0 ? null : stream.Data, new Layout(DataAlignment, DataRank));
+        writer.Block(stream.Data.IsEmpty ? null : stream.Data, new Layout(DataAlignment, DataRank));
     }
 }

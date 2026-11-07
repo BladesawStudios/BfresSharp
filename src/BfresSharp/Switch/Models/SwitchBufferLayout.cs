@@ -76,7 +76,7 @@ public sealed class SwitchBufferLayout
     // The index data and then the streams, as they are laid out in the section.
     public void BuildInto(Span<byte> bytes)
     {
-        foreach ((Mesh mesh, uint offset) in _faces) mesh.IndexData.CopyTo(bytes[(int)offset..]);
+        foreach ((Mesh mesh, uint offset) in _faces) mesh.IndexData.Span.CopyTo(bytes[(int)offset..]);
         foreach ((ClusterMesh cluster, uint offset) in _clusters) cluster.Data.CopyTo(bytes[(int)offset..]);
         foreach (VertexBuffer buffer in Models.Values.SelectMany(model => model.VertexBuffers).Where(buffer => !buffer.IsBlank))
         {
@@ -84,7 +84,7 @@ public sealed class SwitchBufferLayout
             foreach (VertexStream stream in buffer.Streams)
             {
                 position = Align(position, buffer.GpuBufferAlignment);
-                stream.Data.CopyTo(bytes[(int)position..]);
+                stream.Data.Span.CopyTo(bytes[(int)position..]);
                 position += stream.Data.Length;
             }
         }

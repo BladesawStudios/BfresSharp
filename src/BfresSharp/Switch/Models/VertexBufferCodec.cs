@@ -47,7 +47,7 @@ public static class VertexBufferCodec
             {
                 Stride = (ushort)view.U32(strides + index * (long)RecordSize),
                 GpuAccessFlags = view.U32(record + 4),
-                Data = view.Slice(data, view.U32(record)).Span.ToArray(),
+                Data = view.Slice(data, view.U32(record)).Memory,
             };
             data += stream.Data.Length;
             buffer.Streams.Add(stream);

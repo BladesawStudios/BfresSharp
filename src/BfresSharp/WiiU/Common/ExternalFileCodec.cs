@@ -13,7 +13,7 @@ public static class ExternalFileCodec
     public static ExternalFile Read(WiiUReader reader, long at)
     {
         long data = reader.Offset(at);
-        return new ExternalFile { Data = data == 0 ? [] : reader.Bytes(data, reader.View.U32(at + 4)), DataPosition = data == 0 ? -1 : (int)data };
+        return new ExternalFile { Data = data == 0 ? default : reader.Slice(data, reader.View.U32(at + 4)), DataPosition = data == 0 ? -1 : (int)data };
     }
 
     public static void Write(WiiUWriter writer, ExternalFile file)

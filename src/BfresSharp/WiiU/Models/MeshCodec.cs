@@ -33,7 +33,7 @@ public static class MeshCodec
         int copies = Math.Max((int)view.U16(buffer + 0xE), 1);
         mesh.IndexStride = view.U16(buffer + 0xC);
         mesh.IndexBufferCount = view.U16(buffer + 0xE);
-        if (data != 0) mesh.IndexData = reader.Bytes(data, (long)view.I32(buffer + 4) * copies);
+        if (data != 0) mesh.IndexData = reader.Slice(data, (long)view.I32(buffer + 4) * copies);
         return mesh;
     }
 
@@ -58,6 +58,6 @@ public static class MeshCodec
     {
         int copies = Math.Max((int)mesh.IndexBufferCount, 1);
         writer.Out.U32(0).U32((uint)(mesh.IndexData.Length / copies)).U32(0).U16(mesh.IndexStride).U16(mesh.IndexBufferCount).U32(0);
-        writer.Block(mesh.IndexData.Length == 0 ? null : mesh.IndexData, new Layout(IndexAlignment, 0));
+        writer.Block(mesh.IndexData.IsEmpty ? null : mesh.IndexData, new Layout(IndexAlignment, 0));
     }
 }

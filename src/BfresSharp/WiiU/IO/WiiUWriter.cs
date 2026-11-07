@@ -125,9 +125,10 @@ public sealed class WiiUWriter(uint version, int alignment)
     }
 
     // Writes the offset to data that goes behind the name pool; the rank orders the blocks (index, vertex, texture, file).
-    public void Block(byte[]? bytes, Layout layout)
+    // Data that is null writes no block; slices of one array that cover the same bytes share a block, and each empty one is a block of its own.
+    public void Block(ReadOnlyMemory<byte>? bytes, Layout layout)
     {
-        if (bytes is not null) _blocks.Add(bytes.Length == 0 ? new object() : bytes, bytes, layout, Out.Length);
+        if (bytes is { } data) _blocks.Add(BlockKey.Of(data), data, layout, Out.Length);
         Out.U32(0);
     }
 

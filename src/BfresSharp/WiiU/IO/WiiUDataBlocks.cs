@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using BfresSharp.Binary;
 
 namespace BfresSharp.WiiU.IO;
@@ -12,10 +13,10 @@ namespace BfresSharp.WiiU.IO;
 internal sealed class WiiUDataBlocks
 {
     private const int SectionAlignment = 0x40;
-    private readonly Dictionary<object, Block> _known = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<BlockKey, Block> _known = [];
     private readonly List<Block> _blocks = [];
 
-    public void Add(object key, byte[] bytes, Layout layout, int field)
+    public void Add(BlockKey key, ReadOnlyMemory<byte> bytes, Layout layout, int field)
     {
         if (!_known.TryGetValue(key, out Block? block))
         {
@@ -41,18 +42,18 @@ internal sealed class WiiUDataBlocks
             }
 
             foreach (int field in block.Fields) o.SetU32(field, (uint)(position - field));
-            o.SetBytes(position, block.Bytes);
+            o.SetBytes(position, block.Bytes.Span);
             if (block.Layout.PadTo != 0) o.Align(block.Layout.PadTo);
         }
 
         if (_blocks.Count > 0) o.Align(SectionAlignment);
     }
 
-    private sealed class Block(byte[] bytes, Layout layout)
+    private sealed class Block(ReadOnlyMemory<byte> bytes, Layout layout)
     {
         public List<int> Fields { get; } = [];
 
-        public byte[] Bytes { get; } = bytes;
+        public ReadOnlyMemory<byte> Bytes { get; } = bytes;
 
         public Layout Layout { get; } = layout;
     }
@@ -60,3 +61,15 @@ internal sealed class WiiUDataBlocks
 
 /// <summary>Where a data block goes: its alignment and rank, a fixed position if it has one, and what the content is padded to.</summary>
 public readonly record struct Layout(int Alignment, int Rank, int Position = -1, int PadTo = 0);
+
+/// <summary>What identifies a data block: the array the bytes come from and which part of it they cover.</summary>
+/// <remarks>Two keys are equal when they cover the same bytes of the same array, so data that several records share is written once.</remarks>
+public readonly record struct BlockKey(object Owner, int Offset, int Length)
+{
+    public static BlockKey Of(ReadOnlyMemory<byte> bytes)
+    {
+        return !bytes.IsEmpty && MemoryMarshal.TryGetArray(bytes, out ArraySegment<byte> segment) && segment.Array is not null
+            ? new BlockKey(segment.Array, segment.Offset, segment.Count)
+            : new BlockKey(new object(), 0, 0);
+    }
+}

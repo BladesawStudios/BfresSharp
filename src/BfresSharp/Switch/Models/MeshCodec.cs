@@ -43,7 +43,7 @@ public static class MeshCodec
         {
             mesh.BufferFlags = view.U32(sizeRecord + 4);
             int length = (int)view.U32(sizeRecord);
-            mesh.IndexData = view.Slice(reader.BufferBase + view.U32(at + 0x20), length).Span.ToArray();
+            mesh.IndexData = view.Slice(reader.BufferBase + view.U32(at + 0x20), length).Memory;
         }
 
         return mesh;

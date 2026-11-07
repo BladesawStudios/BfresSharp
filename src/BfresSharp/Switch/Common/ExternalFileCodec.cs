@@ -18,7 +18,7 @@ public static class ExternalFileCodec
     {
         long data = reader.Pointer(at);
         int length = (int)reader.View.U64(at + 8);
-        return new ExternalFile { Data = data == 0 ? [] : reader.View.Slice(data, length).Span.ToArray() };
+        return new ExternalFile { Data = data == 0 ? default : reader.View.Slice(data, length).Memory };
     }
 
     // Writes the entries and returns the slot of each data pointer.
@@ -49,12 +49,12 @@ public static class ExternalFileCodec
         long start = 0;
         for (int index = 0; index < files.Count; index++)
         {
-            byte[] data = files.Values[index].Data;
+            ReadOnlyMemory<byte> data = files.Values[index].Data;
             if (data.Length == 0) continue;
             writer.Align(data.Length <= SmallFileLength ? SmallFileAlignment : pageSize);
             if (start == 0) start = writer.Position;
             writer.Resolve(slots[index]);
-            writer.Out.Bytes(data);
+            writer.Out.Bytes(data.Span);
         }
 
         return start;

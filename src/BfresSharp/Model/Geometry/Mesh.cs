@@ -34,7 +34,8 @@ public sealed class Mesh
 
     public List<SubMesh> SubMeshes { get; set; } = [];
 
-    public byte[] IndexData { get; set; } = [];
+    // A slice of the file the mesh was read from until it is replaced, so it keeps that file's bytes alive.
+    public ReadOnlyMemory<byte> IndexData { get; set; }
 
     public int IndexCount => IndexData.Length / IndexSize;
 

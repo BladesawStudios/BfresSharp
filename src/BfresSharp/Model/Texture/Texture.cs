@@ -68,9 +68,9 @@ public sealed class Texture
 
     public uint MipDataSize { get; set; }
 
-    public byte[]? Data { get; set; }
+    public ReadOnlyMemory<byte>? Data { get; set; }
 
-    public byte[]? MipData { get; set; }
+    public ReadOnlyMemory<byte>? MipData { get; set; }
 
     // Where a Wii U file kept the two images, or -1; kept so that textures whose images overlap or sit where a companion file put them write back the same.
     public int DataPosition { get; set; } = -1;

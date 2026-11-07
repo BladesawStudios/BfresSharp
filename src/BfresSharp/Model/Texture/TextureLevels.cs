@@ -23,9 +23,9 @@ public static class TextureLevels
     // The stored bytes of a level, or an empty span when this file does not hold them.
     public static ReadOnlySpan<byte> Surface(Model.Texture.Texture texture, int level)
     {
-        (byte[]? data, int start, int size) = Locate(texture, level);
-        if (data is null || start < 0 || (long)start + size > data.Length) return default;
-        return data.AsSpan(start, size);
+        (ReadOnlyMemory<byte>? data, int start, int size) = Locate(texture, level);
+        if (data is not { } memory || start < 0 || (long)start + size > memory.Length) return default;
+        return memory.Span.Slice(start, size);
     }
 
     public static byte[] Deswizzle(Model.Texture.Texture texture, int level, int slice = 0)
@@ -38,15 +38,19 @@ public static class TextureLevels
         return rows;
     }
 
+    // The texture's data may be a slice of the file it was read from, so the first write copies the buffer that holds the level.
     public static void Swizzle(Model.Texture.Texture texture, int level, int slice, ReadOnlySpan<byte> rows)
     {
         Gx2LevelInfo info = Info(texture, level);
-        (byte[]? data, int start, int size) = Locate(texture, level);
-        if (data is null || start < 0 || (long)start + size > data.Length) throw new InvalidOperationException($"The texture does not hold the data of level {level}.");
-        Gx2Swizzler.Swizzle(info, slice, texture.Swizzle, rows, data.AsSpan(start, size));
+        (ReadOnlyMemory<byte>? data, int start, int size) = Locate(texture, level);
+        if (data is not { } memory || start < 0 || (long)start + size > memory.Length) throw new InvalidOperationException($"The texture does not hold the data of level {level}.");
+        byte[] copy = memory.ToArray();
+        Gx2Swizzler.Swizzle(info, slice, texture.Swizzle, rows, copy.AsSpan(start, size));
+        if (level == 0) texture.Data = copy;
+        else texture.MipData = copy;
     }
 
-    private static (byte[]? Data, int Start, int Size) Locate(Model.Texture.Texture texture, int level)
+    private static (ReadOnlyMemory<byte>? Data, int Start, int Size) Locate(Model.Texture.Texture texture, int level)
     {
         if ((uint)level >= Math.Max(1, texture.MipCount)) return (null, -1, 0);
         uint size = Info(texture, level).Size;

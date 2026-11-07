@@ -25,6 +25,8 @@ public readonly struct ByteView
 
     public ReadOnlySpan<byte> Span => _data.Span;
 
+    public ReadOnlyMemory<byte> Memory => _data;
+
     public ByteView WithOrder(ByteOrder order) => new(_data, order);
 
     public ByteView Slice(long offset, long length)

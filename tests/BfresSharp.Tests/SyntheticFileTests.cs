@@ -27,7 +27,19 @@ public sealed class SyntheticFileTests
         Assert.Equal(file.Name, read.Name);
         Assert.Equal(platform, read.Platform);
         Assert.Equal(file.ExternalFiles.Keys, read.ExternalFiles.Keys);
-        for (int index = 0; index < file.ExternalFiles.Count; index++) Assert.Equal(file.ExternalFiles.Values[index].Data, read.ExternalFiles.Values[index].Data);
+        for (int index = 0; index < file.ExternalFiles.Count; index++) Assert.Equal(file.ExternalFiles.Values[index].Data.ToArray(), read.ExternalFiles.Values[index].Data.ToArray());
+    }
+
+    [Theory]
+    [MemberData(nameof(Versions))]
+    public void LargeDataStaysASliceOfTheBytesItWasReadFrom(BfresPlatform platform, uint raw)
+    {
+        byte[] written = BfresFile.Write(Build(platform, raw));
+        ResFile read = BfresFile.Read(written);
+
+        ReadOnlyMemory<byte> data = read.ExternalFiles.Values[0].Data;
+        Assert.True(System.Runtime.InteropServices.MemoryMarshal.TryGetArray(data, out ArraySegment<byte> segment));
+        Assert.Same(written, segment.Array);
     }
 
     [Theory]
@@ -76,7 +88,7 @@ public sealed class SyntheticFileTests
             TargetAddressSize = 0x40,
         };
         file.ExternalFiles.Add("alpha.bin", new ExternalFile { Data = Enumerable.Range(0, 100).Select(value => (byte)value).ToArray() });
-        file.ExternalFiles.Add("beta.bin", new ExternalFile { Data = [9, 8, 7, 6, 5] });
+        file.ExternalFiles.Add("beta.bin", new ExternalFile { Data = new byte[] { 9, 8, 7, 6, 5 } });
         return file;
     }
 }
