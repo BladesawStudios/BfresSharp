@@ -56,7 +56,6 @@ public static class VisibilityAnimCodec
         var slots = new Slots(writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer());
         writer.Out.U16(modern ? anim.Spare : anim.Flags).U16((ushort)anim.UserData.Count).U32((uint)anim.FrameCount)
             .U16((ushort)anim.Names.Count).U16((ushort)anim.Curves.Count).U32(anim.BakedSize);
-        if (!modern) writer.Out.U32(0);
         return slots;
     }
 
@@ -84,8 +83,8 @@ public static class VisibilityAnimCodec
             writer.Align(8);
         }
 
-        CurveCodec.WriteData(writer, anim.Curves, curveSlots);
         int[] valueSlots = UserDataCodec.WriteArray(writer, anim.UserData, slots.UserArray);
+        CurveCodec.WriteData(writer, anim.Curves, curveSlots);
         UserDataCodec.WriteDictAndValues(writer, anim.UserData, slots.UserDict, valueSlots);
     }
 

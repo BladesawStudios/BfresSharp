@@ -75,9 +75,10 @@ public static class ModelCodec
         SkeletonCodec.WriteBody(writer, model.Skeleton, skeletonSlots);
         WriteDictionary(writer, slots.ShapeDict, model.Shapes);
         WriteDictionary(writer, slots.MaterialDict, model.Materials);
-        UserDataCodec.WriteDictAndValues(writer, model.UserData, slots.UserDict, userSlots);
+        UserDataCodec.WriteDict(writer, model.UserData, slots.UserDict);
         for (int index = 0; index < shapeSlots.Count; index++) ShapeCodec.WriteBody(writer, model.Shapes.Values[index], shapeSlots[index], layout);
         for (int index = 0; index < bufferSlots.Count; index++) VertexBufferCodec.WriteBody(writer, model.VertexBuffers[index], bufferSlots[index]);
+        UserDataCodec.WriteValuesAligned(writer, model.UserData, userSlots);
         for (int index = 0; index < materialSlots.Count; index++) MaterialCodec.WriteBody(writer, model.Materials.Values[index], materialSlots[index]);
     }
 

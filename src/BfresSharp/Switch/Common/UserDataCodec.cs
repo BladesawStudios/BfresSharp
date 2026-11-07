@@ -50,12 +50,23 @@ public static class UserDataCodec
         return WriteEntries(writer, userData);
     }
 
-    // Writes the dictionary and then the values, which come after everything else the section holds.
+    // Writes the dictionary and then the values, for sections that keep both at the end.
     public static void WriteDictAndValues(SwitchWriter writer, ResDict<UserData> userData, int dictSlot, int[] valueSlots)
+    {
+        WriteDict(writer, userData, dictSlot);
+        WriteValuesAligned(writer, userData, valueSlots);
+    }
+
+    public static void WriteDict(SwitchWriter writer, ResDict<UserData> userData, int dictSlot)
     {
         if (userData.Count == 0) return;
         writer.Align(8).Resolve(dictSlot);
         SwitchDictCodec.Write(writer, userData);
+    }
+
+    public static void WriteValuesAligned(SwitchWriter writer, ResDict<UserData> userData, int[] valueSlots)
+    {
+        if (userData.Count == 0) return;
         WriteValues(writer, userData, valueSlots);
         writer.Align(8);
     }
@@ -68,7 +79,7 @@ public static class UserDataCodec
         {
             UserData data = userData.Values[index];
             writer.StringPointer(data.Name);
-            slots[index] = writer.Pointer();
+            slots[index] = data.Value.Length == 0 ? writer.Unlisted() : writer.Pointer();
             writer.Out.U32((uint)data.Value.Length).U8((byte)data.Type).Bytes(data.Reserved);
         }
 

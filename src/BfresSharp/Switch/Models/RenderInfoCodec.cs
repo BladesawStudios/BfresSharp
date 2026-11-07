@@ -38,7 +38,7 @@ public static class RenderInfoCodec
     public static int WriteRecord(SwitchWriter writer, RenderInfo info)
     {
         writer.StringPointer(info.Name);
-        int slot = writer.Pointer();
+        int slot = info.Count == 0 ? writer.Unlisted() : writer.Pointer();
         writer.Out.U16((ushort)info.Count).U8((byte)info.Type).Zeros(5);
         return slot;
     }

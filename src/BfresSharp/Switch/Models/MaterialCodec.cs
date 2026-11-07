@@ -60,15 +60,18 @@ public static class MaterialCodec
         if (profile.Modern) writer.Out.U32(material.Flags);
         else writer.Block();
         writer.StringPointer(material.Name);
+        // Pointers that belong to textures are not recorded for a material without any.
+        bool textured = material.TextureRefs.Count > 0;
+        int Textured() => textured ? writer.Pointer() : writer.Unlisted();
         var slots = new Slots
         {
             RenderInfos = writer.Pointer(), RenderInfoDict = writer.Pointer(), ShaderAssign = writer.Pointer(),
-            TextureUnknown = writer.Pointer(), TextureNames = writer.Pointer(), SamplerUnknown = writer.Pointer(),
+            TextureUnknown = Textured(), TextureNames = Textured(), SamplerUnknown = writer.Pointer(),
             Samplers = writer.Pointer(), SamplerDict = writer.Pointer(), Params = writer.Pointer(), ParamDict = writer.Pointer(),
             ParamData = writer.Pointer(), UserArray = writer.Pointer(), UserDict = writer.Pointer(), Volatile = writer.Pointer(),
         };
         writer.Unlisted();
-        slots = slots with { SamplerSlots = writer.Pointer(), TextureSlots = writer.Pointer() };
+        slots = slots with { SamplerSlots = Textured(), TextureSlots = Textured() };
         if (!profile.Modern) writer.Out.U32(material.Flags);
         writer.Out.U16((ushort)index).U16((ushort)material.RenderInfos.Count).U8((byte)material.TextureRefs.Count)
             .U8((byte)material.Samplers.Count).U16((ushort)material.ShaderParams.Count).U16(0)
@@ -135,7 +138,14 @@ public static class MaterialCodec
 
     private static void WriteSamplers(SwitchWriter writer, Material material, Slots slots)
     {
-        if (material.Samplers.Count == 0) return;
+        if (material.Samplers.Count == 0)
+        {
+            // Without samplers the pointers still land where the parameters start.
+            writer.Align(8).Resolve(slots.Samplers);
+            writer.Resolve(slots.SamplerUnknown);
+            return;
+        }
+
         writer.Align(8).Resolve(slots.Samplers);
         foreach (Sampler sampler in material.Samplers.Values) SamplerCodec.Write(writer, sampler);
         WriteZeros(writer, slots.SamplerUnknown, material.Samplers.Count * SamplerRuntimeLongs * 8);

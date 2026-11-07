@@ -40,9 +40,10 @@ public static class ShaderAssignCodec
     // The three value arrays come first and then the three dictionaries.
     public static void WriteBody(SwitchWriter writer, ShaderAssign assign, Slots slots)
     {
-        WriteValues(writer, assign.AttribAssigns, slots.Attribs);
-        WriteValues(writer, assign.SamplerAssigns, slots.Samplers);
-        WriteValues(writer, assign.ShaderOptions, slots.Options);
+        WriteValues(writer, assign.AttribAssigns, slots.Attribs, resolved: false);
+        writer.Align(8).Resolve(slots.Samplers);
+        WriteValues(writer, assign.SamplerAssigns, slots.Samplers, resolved: true);
+        WriteValues(writer, assign.ShaderOptions, slots.Options, resolved: false);
         WriteDictionary(writer, assign.AttribAssigns, slots.AttribDict);
         WriteDictionary(writer, assign.SamplerAssigns, slots.SamplerDict);
         WriteDictionary(writer, assign.ShaderOptions, slots.OptionDict);
@@ -53,10 +54,11 @@ public static class ShaderAssignCodec
         return reader.ReadDict(dictAt, arrayAt, 8, offset => reader.String(offset) ?? "");
     }
 
-    private static void WriteValues(SwitchWriter writer, ResDict<string> values, int arraySlot)
+    // The sampler array is pointed at even when empty, so its caller resolves it first.
+    private static void WriteValues(SwitchWriter writer, ResDict<string> values, int arraySlot, bool resolved)
     {
         if (values.Count == 0) return;
-        writer.Align(8).Resolve(arraySlot);
+        if (!resolved) writer.Align(8).Resolve(arraySlot);
         foreach (string value in values.Values) writer.StringPointer(value);
     }
 
