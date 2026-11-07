@@ -18,12 +18,24 @@
 
 - Run wider strides and other Wii U titles, and re-run the Switch corpus after the Wii U changes.
 
+## GX2 textures
+
+- `Gx2Swizzler` handles colour surfaces with one sample. Multisampled and depth surfaces are sized by `Gx2SurfaceLayout` but raise `BfresUnsupportedException` when tiled; no BFRES texture uses them.
+- A Wii U to Switch converter needs the rows from `TextureLevels` fed to TexSharp and BntxSharp; nothing connects them yet.
+
+## Design follow-ups
+
+- The Wii U writer still registers records by object identity (`Entry` dictionary hashing). A pass that gives every record an index when it is added would remove the hashing and the hand-matched placement order.
+- The model keeps format detail (reserved bytes, padding words, flag words, `DataPosition`, string order) that a Wii U to Switch conversion has to drop or rebuild.
+- The Wii U and Switch codec trees repeat the structure of every record. A shared description of each record's fields, with the platform layouts as data, would remove the duplication.
+- Public setters on the model do not validate (counts against lists, alignments, versions); a `Validate` pass before `BfresFile.Write` would report them as `BfresFormatException`.
+
 ## Later
 
 - Platform converters (Wii U to Switch and back).
 - TextConvert JSON and text.
 - Helpers, `Half` and `Decimal10x5`.
-- Embedded textures through BntxSharp, TexSharp and TxtgSharp.
+- Switch embedded textures through BntxSharp, TexSharp and TxtgSharp.
 - Performance optimisation.
 - Split `ShaderInfoCodec.cs` (over 256 lines).
 - Full xunit suite.
