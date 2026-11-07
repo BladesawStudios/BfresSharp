@@ -41,11 +41,19 @@ public static class UserDataCodec
         return reader.ReadDict(dictPointerAt, arrayPointerAt, EntrySize, at => Read(reader, at));
     }
 
-    // Writes the entries, the dictionary and the values of a section's user data in file order.
-    public static void WriteAll(SwitchWriter writer, ResDict<UserData> userData, int arraySlot, int dictSlot)
+    // Writes the entries of a section's user data and returns the slots their values pointers must be resolved to. Files
+    // before version 9 point the array at this spot even when it holds nothing.
+    public static int[] WriteArray(SwitchWriter writer, ResDict<UserData> userData, int arraySlot)
     {
+        if (userData.Count == 0 && writer.Profile.Modern) return [];
         writer.Align(8).Resolve(arraySlot);
-        int[] valueSlots = WriteEntries(writer, userData);
+        return WriteEntries(writer, userData);
+    }
+
+    // Writes the dictionary and then the values, which come after everything else the section holds.
+    public static void WriteDictAndValues(SwitchWriter writer, ResDict<UserData> userData, int dictSlot, int[] valueSlots)
+    {
+        if (userData.Count == 0) return;
         writer.Align(8).Resolve(dictSlot);
         SwitchDictCodec.Write(writer, userData);
         WriteValues(writer, userData, valueSlots);

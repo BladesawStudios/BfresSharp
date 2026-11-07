@@ -74,8 +74,9 @@ public static class SkeletalAnimCodec
             foreach (BoneAnim bone in anim.BoneAnims) headers.Add(BoneAnimCodec.WriteHeader(writer, bone));
         }
 
+        int[] valueSlots = UserDataCodec.WriteArray(writer, anim.UserData, slots.UserArray);
         for (int index = 0; index < anim.BoneAnims.Count; index++) WriteBoneData(writer, anim.BoneAnims[index], headers[index]);
-        if (anim.UserData.Count > 0) UserDataCodec.WriteAll(writer, anim.UserData, slots.UserArray, slots.UserDict);
+        UserDataCodec.WriteDictAndValues(writer, anim.UserData, slots.UserDict, valueSlots);
     }
 
     private static void WriteBoneData(SwitchWriter writer, BoneAnim bone, (int Curves, int Base) slots)

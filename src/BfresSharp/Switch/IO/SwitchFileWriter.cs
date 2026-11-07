@@ -1,3 +1,4 @@
+using BfresSharp.Container;
 using BfresSharp.Model;
 using BfresSharp.Switch.Animation;
 using BfresSharp.Switch.Relocation;
@@ -42,18 +43,25 @@ public static class SwitchFileWriter
         int fileSize = writer.Position;
         o.U32(0);
         writer.StringPointer(file.Name);
-        writer.Pointer();
+        SectionArray(writer, present: false);
         writer.Pointer();
         if (writer.Profile.Modern)
         {
             for (int word = 0; word < 4; word++) writer.Unlisted(BitConverter.ToUInt64(file.Reserved, word * 8));
         }
 
-        int skeletalArray = writer.Pointer();
+        int skeletalArray = SectionArray(writer, file.SkeletalAnims.Count > 0);
         int skeletalDict = writer.Pointer();
-        for (int slot = 0; slot < 9; slot++) writer.Pointer();
+        for (int kind = 0; kind < 4; kind++)
+        {
+            SectionArray(writer, present: false);
+            writer.Pointer();
+        }
+
+        if (writer.Profile.Modern && file.Platform != BfresPlatform.Switch2) writer.Pointer();
+        else writer.Unlisted();
         writer.Unlisted();
-        writer.Pointer();
+        SectionArray(writer, present: false);
         writer.Pointer();
         writer.Unlisted();
         int stringTable = writer.Pointer();
@@ -64,6 +72,12 @@ public static class SwitchFileWriter
         if (writer.Profile.Modern) o.U8(file.ExternalFlags).U8(file.SavedFlags);
         else o.Zeros(6);
         return new RootSlots(nameOffset, tableOffset, fileSize, skeletalArray, skeletalDict, stringTable, poolSize);
+    }
+
+    // Files before version 9 list an array pointer in the relocation table only when the array exists.
+    private static int SectionArray(SwitchWriter writer, bool present)
+    {
+        return writer.Profile.Modern || present ? writer.Pointer() : writer.Unlisted();
     }
 
     private static void WriteDictionary<T>(SwitchWriter writer, int slot, ResDict<T> dict)
@@ -82,7 +96,7 @@ public static class SwitchFileWriter
 
     private static int WriteStringPool(SwitchWriter writer, ResFile file, RootSlots root)
     {
-        writer.Align(4);
+        writer.Align(8);
         int start = writer.Position;
         writer.Out.Bytes("_STR"u8);
         writer.Block();
@@ -103,7 +117,8 @@ public static class SwitchFileWriter
         {
             new(0, (uint)stringEnd, [.. RelocationEncoder.Encode(writer.Pointers.Order().ToList())]),
         };
-        for (int unused = 0; unused < 4; unused++) sections.Add(new RelocationSection((uint)stringEnd, 0, []));
+        int emptySections = file.Platform == BfresPlatform.Switch2 ? 5 : 4;
+        for (int unused = 0; unused < emptySections; unused++) sections.Add(new RelocationSection((uint)stringEnd, 0, []));
         writer.Out.Bytes(new RelocationTable(sections).ToBytes((uint)tableAt));
 
         PatchBlocks(writer, file, tableAt);
