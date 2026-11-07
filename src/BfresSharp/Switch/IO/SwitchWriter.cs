@@ -28,6 +28,9 @@ public sealed class SwitchWriter(SwitchProfile profile)
     // File offsets just after the magic of every section that carries a linked header block, in file order.
     public List<int> BlockPositions { get; } = [];
 
+    // Where each dictionary was written, by its keys, so version 9 and later share the copy of an identical one.
+    public Dictionary<string, int> SharedDicts { get; } = new(StringComparer.Ordinal);
+
     // Reserves the 12-byte linked header block that follows a magic in files before version 9; the file writer fills it in.
     public void Block()
     {

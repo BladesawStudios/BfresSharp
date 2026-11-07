@@ -58,7 +58,7 @@ public static class MaterialAnimCodec
         bool textured = anim.TextureNames.Count > 0;
         int bindIndices = writer.Pointer(), itemArray = writer.Pointer(), unknown = writer.Pointer();
         int names = textured ? writer.Pointer() : writer.Unlisted();
-        int userArray = anim.UserData.Count > 0 ? writer.Pointer() : writer.Unlisted();
+        int userArray = anim.UserData.Count > 0 || modern ? writer.Pointer() : writer.Unlisted();
         int userDict = writer.Pointer();
         var slots = new Slots(bindIndices, itemArray, unknown, names, userArray, userDict, textured ? writer.Pointer() : writer.Unlisted());
         ushort users = (ushort)anim.UserData.Count, items = (ushort)anim.Items.Count;
@@ -66,7 +66,7 @@ public static class MaterialAnimCodec
         if (modern) writer.Out.U32((uint)anim.FrameCount).U32(anim.BakedSize).U16(users).U16(items).U16(curves);
         else writer.Out.U16(anim.Flags).U16(users).U16(items).U16(curves).U32((uint)anim.FrameCount).U32(anim.BakedSize);
         writer.Out.U16((ushort)anim.Items.Sum(item => item.ParamCount)).U16((ushort)anim.Items.Sum(item => item.PatternCount))
-            .U16(0).U16((ushort)anim.TextureNames.Count);
+            .U16(modern ? (ushort)anim.Items.Sum(item => item.VisualCount) : (ushort)0).U16((ushort)anim.TextureNames.Count);
         if (modern) writer.Out.U16(0);
         return slots;
     }
@@ -103,6 +103,7 @@ public static class MaterialAnimCodec
         }
 
         if (anim.Items.Count == 0) return;
+        if (anim.TextureNames.Count == 0 && writer.Profile.Modern) return;
         writer.Align(8).Resolve(slots.TextureUnknown);
         if (anim.TextureNames.Count == 0) return;
         writer.Out.Zeros(anim.TextureNames.Count * 8);

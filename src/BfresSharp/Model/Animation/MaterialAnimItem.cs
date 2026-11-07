@@ -31,4 +31,15 @@ public sealed class MaterialAnimItem
     public int ParamCount => ParamAnimInfos.Sum(info => info.ConstantCount + info.FloatCurveCount + info.IntCurveCount);
 
     public int PatternCount => PatternAnimInfos.Count;
+
+    // The curves and constants no parameter or pattern entry claims animate visibility; the header counts them.
+    public int VisualCount
+    {
+        get
+        {
+            int curves = Curves.Count - ParamAnimInfos.Sum(info => info.FloatCurveCount + info.IntCurveCount) - PatternAnimInfos.Count(info => info.CurveIndex >= 0);
+            int constants = Constants.Count - ParamAnimInfos.Sum(info => (int)info.ConstantCount) - PatternAnimInfos.Count(info => info.CurveIndex < 0);
+            return Math.Max(0, curves) + Math.Max(0, constants);
+        }
+    }
 }
