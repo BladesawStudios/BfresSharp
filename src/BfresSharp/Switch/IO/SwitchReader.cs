@@ -92,11 +92,11 @@ public sealed class SwitchReader(ByteView view, SwitchProfile profile)
 
     public ResDict<T> ReadDict<T>(long dictPointerAt, long arrayPointerAt, int elementSize, Func<long, T> readElement)
     {
-        var result = new ResDict<T>();
         long dictAt = Pointer(dictPointerAt);
-        if (dictAt == 0) return result;
+        if (dictAt == 0) return new ResDict<T>();
         long arrayAt = Pointer(arrayPointerAt);
         IReadOnlyList<DictNode> nodes = Dictionary(dictAt);
+        var result = new ResDict<T>(nodes.Count - 1);
         for (int index = 1; index < nodes.Count; index++)
             result.Add(KeyOf(nodes[index]), readElement(arrayAt + (index - 1L) * elementSize), nodes[index].Hash);
         if (result.HasHashedKeys) result.Layout = nodes;

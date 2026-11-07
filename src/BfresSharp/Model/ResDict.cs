@@ -11,10 +11,17 @@ namespace BfresSharp.Model;
 /// </remarks>
 public sealed class ResDict<T> : IReadOnlyList<KeyValuePair<string, T>>
 {
-    private readonly List<string> _keys = [];
-    private readonly List<T> _values = [];
-    private readonly List<ulong?> _hashes = [];
-    private readonly Dictionary<string, int> _index = new(StringComparer.Ordinal);
+    private const int IndexThreshold = 8;
+    private readonly List<string> _keys;
+    private readonly List<T> _values;
+    private List<ulong?>? _hashes;
+    private Dictionary<string, int>? _index;
+
+    public ResDict(int capacity = 0)
+    {
+        _keys = new List<string>(capacity);
+        _values = new List<T>(capacity);
+    }
 
     public int Count => _keys.Count;
 
@@ -29,35 +36,48 @@ public sealed class ResDict<T> : IReadOnlyList<KeyValuePair<string, T>>
         get => _values[IndexOf(key) is var at and >= 0 ? at : throw new KeyNotFoundException($"No entry named \"{key}\"")];
         set
         {
-            if (_index.TryGetValue(key, out int at)) _values[at] = value;
+            if (IndexOf(key) is var at and >= 0) _values[at] = value;
             else Add(key, value);
         }
     }
 
-    public bool HasHashedKeys => _hashes.Any(hash => hash.HasValue);
+    public bool HasHashedKeys => _hashes is not null && _hashes.Any(hash => hash.HasValue);
 
     // The search tree as the file had it. A tree over hashes cannot be rebuilt without the names, so it is kept to write back.
     public IReadOnlyList<DictNode>? Layout { get; set; }
 
     // Whether the kept tree still describes these entries: the same hashes in the same order.
     public bool LayoutMatches => Layout is { } nodes && nodes.Count == Count + 1
-        && Enumerable.Range(0, Count).All(index => nodes[index + 1].Hash == _hashes[index]);
+        && Enumerable.Range(0, Count).All(index => nodes[index + 1].Hash == HashOf(index));
 
     public void Add(string key, T value, ulong? hash = null)
     {
-        if (!_index.TryAdd(key, _keys.Count)) throw new ArgumentException($"Key \"{key}\" already exists.", nameof(key));
+        if (IndexOf(key) >= 0) throw new ArgumentException($"Key \"{key}\" already exists.", nameof(key));
+        _index?.Add(key, _keys.Count);
         _keys.Add(key);
         _values.Add(value);
-        _hashes.Add(hash);
+        if (hash.HasValue) (_hashes ??= [.. new ulong?[_keys.Count - 1]]).Add(hash);
+        else _hashes?.Add(null);
+        if (_index is null && _keys.Count > IndexThreshold) BuildIndex();
     }
 
-    public bool ContainsKey(string key) => _index.ContainsKey(key);
+    public bool ContainsKey(string key) => IndexOf(key) >= 0;
 
-    public int IndexOf(string key) => _index.TryGetValue(key, out int at) ? at : -1;
+    // Short dictionaries are searched in order, which beats hashing; longer ones get an index once they outgrow that.
+    public int IndexOf(string key)
+    {
+        if (_index is not null) return _index.TryGetValue(key, out int at) ? at : -1;
+        for (int position = 0; position < _keys.Count; position++)
+        {
+            if (string.Equals(_keys[position], key, StringComparison.Ordinal)) return position;
+        }
+
+        return -1;
+    }
 
     public bool TryGetValue(string key, out T value)
     {
-        if (_index.TryGetValue(key, out int at))
+        if (IndexOf(key) is var at and >= 0)
         {
             value = _values[at];
             return true;
@@ -67,17 +87,17 @@ public sealed class ResDict<T> : IReadOnlyList<KeyValuePair<string, T>>
         return false;
     }
 
-    public ulong? HashOf(int index) => _hashes[index];
+    public ulong? HashOf(int index) => _hashes?[index];
 
     public void Rename(string key, string newKey)
     {
         int at = IndexOf(key);
         if (at < 0) throw new KeyNotFoundException($"No entry named \"{key}\"");
-        if (key != newKey && _index.ContainsKey(newKey)) throw new ArgumentException($"Key \"{newKey}\" already exists.", nameof(newKey));
-        _index.Remove(key);
-        _index[newKey] = at;
+        if (key != newKey && IndexOf(newKey) >= 0) throw new ArgumentException($"Key \"{newKey}\" already exists.", nameof(newKey));
+        _index?.Remove(key);
+        if (_index is not null) _index[newKey] = at;
         _keys[at] = newKey;
-        _hashes[at] = null;
+        if (_hashes is not null) _hashes[at] = null;
     }
 
     public bool Remove(string key)
@@ -90,10 +110,11 @@ public sealed class ResDict<T> : IReadOnlyList<KeyValuePair<string, T>>
 
     public void RemoveAt(int index)
     {
-        _index.Remove(_keys[index]);
+        _index?.Remove(_keys[index]);
         _keys.RemoveAt(index);
         _values.RemoveAt(index);
-        _hashes.RemoveAt(index);
+        _hashes?.RemoveAt(index);
+        if (_index is null) return;
         for (int at = index; at < _keys.Count; at++) _index[_keys[at]] = at;
     }
 
@@ -101,8 +122,14 @@ public sealed class ResDict<T> : IReadOnlyList<KeyValuePair<string, T>>
     {
         _keys.Clear();
         _values.Clear();
-        _hashes.Clear();
-        _index.Clear();
+        _hashes = null;
+        _index = null;
+    }
+
+    private void BuildIndex()
+    {
+        _index = new Dictionary<string, int>(_keys.Count * 2, StringComparer.Ordinal);
+        for (int position = 0; position < _keys.Count; position++) _index[_keys[position]] = position;
     }
 
     public IEnumerator<KeyValuePair<string, T>> GetEnumerator()
