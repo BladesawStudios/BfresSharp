@@ -74,6 +74,13 @@ public sealed class ByteBuilder
         return remainder == 0 ? this : Zeros(alignment - remainder);
     }
 
+    public void SetU16(int offset, ushort value)
+    {
+        Span<byte> span = _buffer.AsSpan(offset, 2);
+        if (Order == ByteOrder.Little) BinaryPrimitives.WriteUInt16LittleEndian(span, value);
+        else BinaryPrimitives.WriteUInt16BigEndian(span, value);
+    }
+
     public void SetU32(int offset, uint value)
     {
         Span<byte> span = _buffer.AsSpan(offset, 4);
