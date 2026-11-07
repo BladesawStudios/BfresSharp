@@ -12,8 +12,7 @@ public static class ExternalFileCodec
 {
     public const int Size = 16;
     private const int SmallFileLength = 3;
-    private const int SmallFileAlignment = 512;
-    private const int SmallSectionAlignment = 256;
+    private const int SmallFileAlignment = 256;
 
     public static ExternalFile Read(SwitchReader reader, long at)
     {
@@ -39,7 +38,7 @@ public static class ExternalFileCodec
     public static int TailAlignment(ResDict<ExternalFile> files, int pageSize)
     {
         if (files.Count == 0) return 8;
-        return files.Values[^1].Data.Length <= SmallFileLength ? SmallSectionAlignment : pageSize;
+        return files.Values[^1].Data.Length <= SmallFileLength ? SmallFileAlignment : pageSize;
     }
 
     // Places each file's data at the end of the archive; returns where the first file starts.

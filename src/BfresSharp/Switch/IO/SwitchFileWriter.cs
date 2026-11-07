@@ -29,6 +29,8 @@ public static class SwitchFileWriter
         var models = file.Models.Values.Select(model => ModelCodec.WriteHeader(writer, model)).ToList();
         if (file.SkeletalAnims.Count > 0) writer.Resolve(root.SkeletalAnims);
         var skeletal = file.SkeletalAnims.Values.Select(anim => SkeletalAnimCodec.WriteHeader(writer, anim)).ToList();
+        if (file.MaterialAnims.Count > 0) writer.Resolve(root.MaterialAnims);
+        var material = file.MaterialAnims.Values.Select(anim => MaterialAnimCodec.WriteHeader(writer, anim)).ToList();
         if (file.VisibilityAnims.Count > 0) writer.Resolve(root.VisibilityAnims);
         var visibility = file.VisibilityAnims.Values.Select(anim => VisibilityAnimCodec.WriteHeader(writer, anim)).ToList();
         int bufferData = WriteBufferInfo(writer, root, layout);
@@ -36,11 +38,13 @@ public static class SwitchFileWriter
         int[] externalSlots = ExternalFileCodec.WriteEntries(writer, file.ExternalFiles);
         WriteDictionary(writer, root.ModelDict, file.Models);
         WriteDictionary(writer, root.SkeletalAnimDict, file.SkeletalAnims);
+        WriteDictionary(writer, root.MaterialAnimDict, file.MaterialAnims);
         WriteDictionary(writer, root.VisibilityAnimDict, file.VisibilityAnims);
         WriteDictionary(writer, root.ExternalFileDict, file.ExternalFiles);
         for (int index = 0; index < models.Count; index++) ModelCodec.WriteBody(writer, file.Models.Values[index], models[index], layout);
         for (int index = 0; index < skeletal.Count; index++) SkeletalAnimCodec.WriteBody(writer, file.SkeletalAnims.Values[index], skeletal[index]);
         for (int index = 0; index < visibility.Count; index++) VisibilityAnimCodec.WriteBody(writer, file.VisibilityAnims.Values[index], visibility[index]);
+        for (int index = 0; index < material.Count; index++) MaterialAnimCodec.WriteBody(writer, file.MaterialAnims.Values[index], material[index]);
 
         int poolStart = WriteStringPool(writer, file, root);
         return Finish(writer, file, root, layout, bufferData, externalSlots);
@@ -66,8 +70,8 @@ public static class SwitchFileWriter
 
         int skeletalArray = SectionArray(writer, file.SkeletalAnims.Count > 0);
         int skeletalDict = writer.Pointer();
-        SectionArray(writer, present: false);
-        writer.Pointer();
+        int materialArray = SectionArray(writer, file.MaterialAnims.Count > 0);
+        int materialDict = writer.Pointer();
         int visibilityArray = SectionArray(writer, file.VisibilityAnims.Count > 0);
         int visibilityDict = writer.Pointer();
         for (int kind = 0; kind < 2; kind++)
@@ -87,10 +91,10 @@ public static class SwitchFileWriter
         int poolSize = writer.Position;
         o.U32(0).U16((ushort)file.Models.Count);
         if (writer.Profile.Modern) o.U16(0).U16(0);
-        o.U16((ushort)file.SkeletalAnims.Count).U16(0).U16((ushort)file.VisibilityAnims.Count).U16(0).U16(0).U16((ushort)file.ExternalFiles.Count);
+        o.U16((ushort)file.SkeletalAnims.Count).U16((ushort)file.MaterialAnims.Count).U16((ushort)file.VisibilityAnims.Count).U16(0).U16(0).U16((ushort)file.ExternalFiles.Count);
         if (writer.Profile.Modern) o.U8(file.ExternalFlags).U8(file.SavedFlags);
         else o.Zeros(6);
-        return new RootSlots(nameOffset, tableOffset, fileSize, modelArray, modelDict, skeletalArray, skeletalDict, visibilityArray, visibilityDict, bufferInfo, externalArray, externalDict, stringTable, poolSize);
+        return new RootSlots(nameOffset, tableOffset, fileSize, modelArray, modelDict, skeletalArray, skeletalDict, materialArray, materialDict, visibilityArray, visibilityDict, bufferInfo, externalArray, externalDict, stringTable, poolSize);
     }
 
     // Files before version 9 list an array pointer in the relocation table only when the array exists.
@@ -191,6 +195,8 @@ public static class SwitchFileWriter
         int ModelDict,
         int SkeletalAnims,
         int SkeletalAnimDict,
+        int MaterialAnims,
+        int MaterialAnimDict,
         int VisibilityAnims,
         int VisibilityAnimDict,
         int BufferInfo,

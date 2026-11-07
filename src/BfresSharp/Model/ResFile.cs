@@ -39,5 +39,7 @@ public sealed class ResFile
 
     public ResDict<SkeletalAnim> SkeletalAnims { get; set; } = new();
 
+    public ResDict<MaterialAnim> MaterialAnims { get; set; } = new();
+
     public ResDict<VisibilityAnim> VisibilityAnims { get; set; } = new();
 }

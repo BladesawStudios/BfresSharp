@@ -187,7 +187,8 @@ public static class CurveCodec
 
     private static void WriteBoolWords(SwitchWriter writer, AnimCurve curve)
     {
-        var words = new uint[Math.Max(1, (curve.BoolKeys.Length + 31) / 32)];
+        // Bits are packed 32 to a word, but the block holds a word for each key; the words past the bits are zero.
+        var words = new uint[Math.Max(1, curve.BoolKeys.Length)];
         for (int key = 0; key < curve.BoolKeys.Length; key++)
         {
             if (curve.BoolKeys[key]) words[key / 32] |= 1u << (key % 32);

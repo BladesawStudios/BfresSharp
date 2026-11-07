@@ -49,7 +49,7 @@ public static class SwitchFileReader
         file.Models = reader.ReadDict(SwitchRootLayout.ModelDict, SwitchRootLayout.Models, ModelCodec.Size(profile), at => ModelCodec.Read(reader, at));
         int counts = layout.AnimCounts;
         file.SkeletalAnims = reader.ReadDict(layout.SkeletalAnims + 8, layout.SkeletalAnims, SkeletalAnimCodec.Size(profile), at => SkeletalAnimCodec.Read(reader, at));
-        RequireEmpty(reader, layout.MaterialAnims, view.U16(counts + 2), "material animations");
+        file.MaterialAnims = reader.ReadDict(layout.MaterialAnims + 8, layout.MaterialAnims, MaterialAnimCodec.Size(profile), at => MaterialAnimCodec.Read(reader, at));
         file.VisibilityAnims = reader.ReadDict(layout.BoneVisibilityAnims + 8, layout.BoneVisibilityAnims, VisibilityAnimCodec.Size(profile), at => VisibilityAnimCodec.Read(reader, at));
         RequireEmpty(reader, layout.ShapeAnims, view.U16(counts + 6), "shape animations");
         RequireEmpty(reader, layout.SceneAnims, view.U16(counts + 8), "scene animations");
