@@ -73,13 +73,14 @@ public sealed class WiiUWriter(uint version, int alignment)
 
         if (!_groups.ContainsKey(dict))
         {
+            var entries = new Entry[dict.Count];
             for (int index = 0; index < dict.Count; index++)
             {
                 T value = dict.Values[index];
-                Register(value, index, () => write(value, Index));
+                entries[index] = Register(value, index, () => write(value, Index));
             }
 
-            _groups[dict] = [new Entry(-1, () => WriteDict(dict, value => Point(_entries[value!])))];
+            _groups[dict] = [new Entry(-1, () => WriteDict(dict, index => Point(entries[index])))];
         }
 
         Point(_groups[dict][0]);
@@ -94,7 +95,7 @@ public sealed class WiiUWriter(uint version, int alignment)
             return;
         }
 
-        if (!_groups.ContainsKey(dict)) _groups[dict] = [new Entry(-1, () => WriteDict(dict, text => Name(text)))];
+        if (!_groups.ContainsKey(dict)) _groups[dict] = [new Entry(-1, () => WriteDict(dict, index => Name(dict.Values[index])))];
         Point(_groups[dict][0]);
     }
 
@@ -157,10 +158,8 @@ public sealed class WiiUWriter(uint version, int alignment)
 
     public void Finish()
     {
-        foreach (Entry entry in _entries.Values.Concat(_groups.Values.SelectMany(group => group)).Distinct())
-        {
-            if (entry.Target < 0 && entry.Fields.Count > 0) throw new InvalidOperationException("A record was referenced but never placed");
-        }
+        bool unplaced = _entries.Values.Any(Unplaced) || _groups.Values.Any(group => group.Any(Unplaced));
+        if (unplaced) throw new InvalidOperationException("A record was referenced but never placed");
 
         Pool = _names.Write(Out);
         _blocks.Write(Out);
@@ -172,10 +171,12 @@ public sealed class WiiUWriter(uint version, int alignment)
         if (entry.Target >= 0) Out.U32((uint)(entry.Target - Out.Length));
         else
         {
-            entry.Fields.Add(Out.Length);
+            entry.AddField(Out.Length);
             Out.U32(0);
         }
     }
+
+    private static bool Unplaced(Entry entry) => entry.Target < 0 && entry.HasFields;
 
     private void Group<T>(IReadOnlyList<T> list, bool pointWhenEmpty, Func<T, int, Entry> make)
     {
@@ -209,12 +210,12 @@ public sealed class WiiUWriter(uint version, int alignment)
         if (entry.Target >= 0) return;
         Out.Align(4);
         entry.Target = Out.Length;
-        foreach (int field in entry.Fields) Out.SetU32(field, (uint)(entry.Target - field));
+        entry.Resolve(Out);
         Index = entry.Index;
         entry.Write();
     }
 
-    private void WriteDict<T>(ResDict<T> dict, Action<T> value)
+    private void WriteDict<T>(ResDict<T> dict, Action<int> value)
     {
         var nodes = WiiUDictCodec.Nodes(dict.Keys);
         Out.U32((uint)(8 + nodes.Count * 16)).U32((uint)dict.Count);
@@ -223,13 +224,32 @@ public sealed class WiiUWriter(uint version, int alignment)
             Out.U32(nodes[index].Reference).U16(nodes[index].Left).U16(nodes[index].Right);
             Name(index == 0 ? null : dict.Keys[index - 1]);
             if (index == 0) Out.U32(0);
-            else value(dict.Values[index - 1]);
+            else value(index - 1);
         }
     }
 
     private sealed class Entry(int index, Action write)
     {
-        public List<int> Fields { get; } = [];
+        private int _first = -1;
+        private List<int>? _more;
+
+        public bool HasFields => _first >= 0;
+
+        // Most records are pointed at once, so the first field is kept inline and only more than one needs a list.
+        public void AddField(int field)
+        {
+            if (_first < 0) _first = field;
+            else (_more ??= []).Add(field);
+        }
+
+        // Points every field that refers to this entry at its position.
+        public void Resolve(ByteBuilder o)
+        {
+            if (_first < 0) return;
+            o.SetU32(_first, (uint)(Target - _first));
+            if (_more is null) return;
+            foreach (int field in _more) o.SetU32(field, (uint)(Target - field));
+        }
 
         public int Target { get; set; } = -1;
 
