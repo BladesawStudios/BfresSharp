@@ -13,7 +13,7 @@ namespace BfresSharp.Switch.IO;
 public sealed class SwitchWriter(SwitchProfile profile)
 {
     private readonly List<long> _pointers = [];
-    private readonly SortedDictionary<string, List<long>> _strings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<long>> _strings = new(StringComparer.Ordinal);
 
     public SwitchProfile Profile { get; } = profile;
 
@@ -119,8 +119,10 @@ public sealed class SwitchWriter(SwitchProfile profile)
             Align(2);
             placed[text] = Position;
             foreach (long slot in slots) Out.SetU64((int)slot, (ulong)Position);
-            byte[] bytes = Encoding.UTF8.GetBytes(text);
-            Out.U16((ushort)bytes.Length).Bytes(bytes).U8(0);
+            int length = Encoding.UTF8.GetByteCount(text);
+            Out.U16((ushort)length);
+            Encoding.UTF8.GetBytes(text, Out.Claim(length));
+            Out.U8(0);
         }
 
         Align(2);
@@ -137,10 +139,9 @@ public sealed class SwitchWriter(SwitchProfile profile)
             if (_strings.TryGetValue(text, out List<long>? slots) && seen.Add(text)) yield return new(text, slots);
         }
 
-        foreach ((string text, List<long> slots) in _strings)
-        {
-            if (seen.Add(text)) yield return new(text, slots);
-        }
+        string[] rest = [.. _strings.Keys.Where(text => !seen.Contains(text))];
+        Array.Sort(rest, StringComparer.Ordinal);
+        foreach (string text in rest) yield return new(text, _strings[text]);
     }
 
     // The empty name is always in the pool, whether or not a pointer uses it.

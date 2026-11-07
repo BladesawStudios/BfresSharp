@@ -10,8 +10,8 @@ namespace BfresSharp.WiiU.IO;
 /// </remarks>
 internal sealed class WiiUNamePool
 {
-    private static readonly IComparer<string> Order = Comparer<string>.Create(Compare);
-    private readonly SortedDictionary<string, Entry> _names = new(Order);
+    private static readonly Comparison<string> Order = Compare;
+    private readonly Dictionary<string, Entry> _names = new(StringComparer.Ordinal);
 
     public void Add(string text, Encoding encoding, int field)
     {
@@ -24,12 +24,16 @@ internal sealed class WiiUNamePool
     {
         o.Align(4);
         int start = o.Length;
-        foreach ((string text, Entry entry) in _names)
+        string[] texts = [.. _names.Keys];
+        Array.Sort(texts, Order);
+        foreach (string text in texts)
         {
-            byte[] bytes = entry.Encoding.GetBytes(text);
-            o.U32((uint)bytes.Length);
+            Entry entry = _names[text];
+            int length = entry.Encoding.GetByteCount(text);
+            o.U32((uint)length);
             foreach (int field in entry.Fields) o.SetU32(field, (uint)(o.Length - field));
-            o.Bytes(bytes).Zeros(entry.Encoding.GetByteCount("\0")).Align(4);
+            entry.Encoding.GetBytes(text, o.Claim(length));
+            o.Zeros(entry.Encoding.GetByteCount("\0")).Align(4);
         }
 
         return (start, o.Length - start);
