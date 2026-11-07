@@ -14,6 +14,7 @@ namespace BfresSharp.Switch.Animation;
 public static class CurveCodec
 {
     public const int HeaderSize = 0x30;
+    private const ushort PlainKeysFlag = 0x80;
 
     public static AnimCurve Read(SwitchReader reader, long at)
     {
@@ -170,9 +171,11 @@ public static class CurveCodec
         }
     }
 
+    // Bit 7 marks a curve flagged compressed whose keys are still the four plain coefficients a segment.
     private static bool UsesCompressedData(AnimCurve curve)
     {
-        return curve.IsCompressed && curve.CurveType is AnimCurveType.Cubic or AnimCurveType.Linear
+        if (!curve.IsCompressed || (curve.Flags & PlainKeysFlag) != 0) return false;
+        return curve.CurveType is AnimCurveType.Cubic or AnimCurveType.Linear
             or AnimCurveType.StepFloat or AnimCurveType.StepInt or AnimCurveType.StepBool;
     }
 
