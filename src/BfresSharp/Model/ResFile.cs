@@ -43,6 +43,21 @@ public sealed class ResFile
 
     public ResDict<ExternalFile> ExternalFiles { get; set; } = new();
 
+    // The flag in ExternalFlags of a file whose external entries are 64-bit name hashes, not embedded files.
+    public const byte ExternalStringsFlag = 4;
+
+    // Switch 2 keeps the strings its other files leave out as hashes (ExternalBinaryString.bfres): each entry is a
+    // name and the 64-bit hash that other files use in its place. Such a file has no ExternalFiles.
+    public ResDict<ulong> ExternalStringHashes { get; set; } = new();
+
+    // The names of ExternalStringHashes by hash, for turning the hashes other files hold back into names.
+    public Dictionary<ulong, string> NamesByHash()
+    {
+        var names = new Dictionary<ulong, string>(ExternalStringHashes.Count);
+        foreach (KeyValuePair<string, ulong> entry in ExternalStringHashes) names[entry.Value] = entry.Key;
+        return names;
+    }
+
     public ResDict<SkeletalAnim> SkeletalAnims { get; set; } = new();
 
     public ResDict<MaterialAnim> MaterialAnims { get; set; } = new();

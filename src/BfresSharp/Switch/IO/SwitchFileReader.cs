@@ -57,7 +57,8 @@ public static class SwitchFileReader
         file.VisibilityAnims = reader.ReadDict(layout.BoneVisibilityAnims + 8, layout.BoneVisibilityAnims, VisibilityAnimCodec.Size(profile), at => VisibilityAnimCodec.Read(reader, at));
         file.ShapeAnims = reader.ReadDict(layout.ShapeAnims + 8, layout.ShapeAnims, ShapeAnimCodec.Size(profile), at => ShapeAnimCodec.Read(reader, at));
         RequireEmpty(reader, layout.SceneAnims, view.U16(counts + 8), "scene animations");
-        file.ExternalFiles = reader.ReadDict(layout.ExternalFiles + 8, layout.ExternalFiles, ExternalFileCodec.Size, at => ExternalFileCodec.Read(reader, at));
+        if ((file.ExternalFlags & ResFile.ExternalStringsFlag) != 0) file.ExternalStringHashes = reader.ReadDict(layout.ExternalFiles + 8, layout.ExternalFiles, sizeof(ulong), at => view.U64(at));
+        else file.ExternalFiles = reader.ReadDict(layout.ExternalFiles + 8, layout.ExternalFiles, ExternalFileCodec.Size, at => ExternalFileCodec.Read(reader, at));
         return file;
     }
 

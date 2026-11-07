@@ -27,6 +27,7 @@ public static class SwitchFileWriter
 
     private static Binary.ByteBuilder Build(ResFile file)
     {
+        if (file.ExternalStringHashes.Count > 0) throw new Errors.BfresUnsupportedException("Writing a file of external string hashes is not supported");
         var writer = new SwitchWriter(SwitchProfile.For(file.Version));
         var layout = new SwitchBufferLayout(file);
         RootSlots root = WriteHeader(writer, file, layout);
