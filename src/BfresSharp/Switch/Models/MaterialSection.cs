@@ -14,7 +14,6 @@ public sealed class MaterialSection
     private readonly ResModel _model;
     private readonly List<MaterialCodec.Slots> _legacy = [];
     private readonly List<MaterialV10Writer.Slots> _slots = [];
-    private readonly List<int[]> _userSlots = [];
 
     public MaterialSection(SwitchProfile profile, ResModel model)
     {
@@ -45,13 +44,12 @@ public sealed class MaterialSection
     {
         for (int index = 0; index < _model.Materials.Count; index++)
         {
-            if (_v10) _userSlots.Add(MaterialV10Writer.WriteBody(writer, _model.Materials.Values[index], _slots[index], Assigns));
+            if (_v10) MaterialV10Writer.WriteBody(writer, _model.Materials.Values[index], _slots[index], Assigns);
             else MaterialCodec.WriteBody(writer, _model.Materials.Values[index], _legacy[index]);
         }
 
         if (!_v10) return;
-        // The shared assignments follow every material, and the user data of the materials follows them.
+        // The shared assignments follow every material.
         foreach (var material in _model.Materials.Values) Assigns.WriteBodyOnce(writer, material);
-        for (int index = 0; index < _model.Materials.Count; index++) MaterialV10Writer.WriteUserData(writer, _model.Materials.Values[index], _slots[index], _userSlots[index]);
     }
 }

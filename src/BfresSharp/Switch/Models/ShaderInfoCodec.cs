@@ -38,8 +38,10 @@ public static class ShaderInfoCodec
         writer.Pointer(assignAt);
         int Slot(bool present) => present ? writer.Pointer() : writer.Unlisted();
         int attribNames = writer.Pointer(), attribIndices = Slot(attribs.NeedsIndices);
-        int samplerNames = Slot(samplers.Names.Count > 0), samplerIndices = Slot(samplers.NeedsIndices);
-        int bits = Slot(options.Switches.Count > 0), values = Slot(options.Values.Count > 0), optionIndices = Slot(options.NeedsIndices);
+        // An info whose shader has no sampler or option keys lists the same null pointers as one with options.
+        bool hasOptions = options.Switches.Count + options.Values.Count > 0 || assign.SamplerAssigns.Count + assign.ShaderOptions.Count == 0;
+        int samplerNames = Slot(samplers.Names.Count > 0 || hasOptions), samplerIndices = Slot(samplers.NeedsIndices);
+        int bits = Slot(hasOptions), values = Slot(hasOptions), optionIndices = Slot(options.NeedsIndices);
         writer.Out.U32(0).U8((byte)attribs.Names.Count).U8((byte)samplers.Names.Count).U16((ushort)options.Switches.Count)
             .U16((ushort)(options.Switches.Count + options.Values.Count)).U16(0).U32(0);
         WriteNames(writer, attribNames, attribs.Names);

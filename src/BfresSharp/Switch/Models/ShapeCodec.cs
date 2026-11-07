@@ -38,10 +38,11 @@ public static class ShapeCodec
         long meshes = reader.Pointer(fields + 0x10);
         long skin = reader.Pointer(fields + 0x18);
         shape.KeyShapes = reader.ReadDict(fields + 0x28, fields + 0x20, 24, offset => ReadKeyShape(view, offset));
-        if (meshes != 0) shape.Meshes = reader.ReadArray(meshes, meshCount, MeshCodec.Size, offset => MeshCodec.Read(reader, offset)).ToList();
+        if (meshes != 0 && meshCount == 0) shape.Cluster = ClusterMeshCodec.Read(reader, meshes);
+        else if (meshes != 0) shape.Meshes = reader.ReadArray(meshes, meshCount, MeshCodec.Size, offset => MeshCodec.Read(reader, offset)).ToList();
         if (skin != 0) shape.SkinBoneIndices = reader.ReadArray(skin, skinCount, 2, offset => view.U16(offset)).ToList();
         ReadBoundings(reader, shape, fields);
-        ReadRadii(reader, shape, reader.Pointer(fields + 0x38), meshCount, skinCount);
+        ReadRadii(reader, shape, reader.Pointer(fields + 0x38), meshCount > 0 || shape.Cluster is not null, skinCount);
         return shape;
     }
 
@@ -72,8 +73,9 @@ public static class ShapeCodec
     // The mesh headers, skin bone indices, bounding boxes, key shapes, radii and then each mesh's own records.
     public static void WriteBody(SwitchWriter writer, Shape shape, Slots slots, SwitchBufferLayout layout)
     {
-        if (shape.Meshes.Count > 0) writer.Align(8).Resolve(slots.Meshes);
+        if (shape.Meshes.Count > 0 || shape.Cluster is not null) writer.Align(8).Resolve(slots.Meshes);
         var meshSlots = shape.Meshes.Select(mesh => MeshCodec.WriteHeader(writer, mesh, layout.FaceOffset(mesh))).ToList();
+        ClusterMeshCodec.Slots? clusterSlots = shape.Cluster is null ? null : ClusterMeshCodec.WriteHeader(writer, shape.Cluster);
         // Before version 9 the skin bone pointer is set even when no bone follows.
         if (shape.SkinBoneIndices.Count > 0 || !writer.Profile.Modern) writer.Align(8).Resolve(slots.SkinBoneIndices);
         foreach (ushort index in shape.SkinBoneIndices) writer.Out.U16(index);
@@ -86,6 +88,7 @@ public static class ShapeCodec
 
         WriteKeyShapes(writer, shape, slots);
         WriteRadii(writer, shape, slots);
+        if (shape.Cluster is not null && clusterSlots is { } cluster) ClusterMeshCodec.WriteBody(writer, shape.Cluster, cluster, layout.ClusterOffset(shape.Cluster));
         for (int index = 0; index < shape.Meshes.Count; index++)
         {
             MeshCodec.WriteSubMeshes(writer, shape.Meshes[index], meshSlots[index]);
@@ -118,15 +121,15 @@ public static class ShapeCodec
     private static void ReadBoundings(SwitchReader reader, Shape shape, long fields)
     {
         long boundings = reader.Pointer(fields + 0x30);
-        int count = shape.Meshes.Sum(mesh => mesh.SubMeshes.Count + 1);
+        int count = shape.Cluster is not null ? 1 : shape.Meshes.Sum(mesh => mesh.SubMeshes.Count + 1);
         if (boundings == 0 || count == 0) return;
         var view = reader.View;
         shape.SubMeshBoundings = reader.ReadArray(boundings, count, 24, offset => new Bounding(ReadVector3(view, offset), ReadVector3(view, offset + 12))).ToList();
     }
 
-    private static void ReadRadii(SwitchReader reader, Shape shape, long radii, int meshCount, int skinCount)
+    private static void ReadRadii(SwitchReader reader, Shape shape, long radii, bool hasGeometry, int skinCount)
     {
-        if (radii == 0 || meshCount == 0) return;
+        if (radii == 0 || !hasGeometry) return;
         var view = reader.View;
         if (reader.Profile.Version.Major >= 10)
         {
@@ -135,7 +138,7 @@ public static class ShapeCodec
         }
         else
         {
-            shape.Radii = reader.ReadArray(radii, meshCount, 4, offset => view.F32(offset)).ToList();
+            shape.Radii = reader.ReadArray(radii, shape.Meshes.Count, 4, offset => view.F32(offset)).ToList();
         }
     }
 

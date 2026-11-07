@@ -33,6 +33,9 @@ public sealed class Shape
 
     public List<Mesh> Meshes { get; set; } = [];
 
+    // Set instead of meshes by Switch 2 shapes that keep their geometry in clusters.
+    public ClusterMesh? Cluster { get; set; }
+
     public List<ushort> SkinBoneIndices { get; set; } = [];
 
     public ResDict<KeyShape> KeyShapes { get; set; } = new();

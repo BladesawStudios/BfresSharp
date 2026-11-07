@@ -39,6 +39,18 @@ public static class SwitchSectionBuilder
             return sections;
         }
 
+        if (layout.HasClusters)
+        {
+            // Cluster data sits in the section where Switch 2 files otherwise keep nothing; index and vertex sections stay empty.
+            sections.Add(new RelocationSection(stringEnd, 0, []));
+            sections.Add(new RelocationSection(stringEnd, 0, []));
+            var inBuffer = groups[1].Concat(groups[2]).Order().ToList();
+            sections.Add(new RelocationSection((uint)bounds.BufferBase, (uint)layout.TotalSize, [.. RelocationEncoder.Encode(inBuffer)]));
+            sections.Add(new RelocationSection((uint)bounds.PoolAt, MemoryPoolSize, [.. RelocationEncoder.Encode(groups[3])]));
+            sections.Add(new RelocationSection(hasExternal ? (uint)bounds.ExternalAt : (uint)(bounds.PoolAt + MemoryPoolSize), externalLength, [.. RelocationEncoder.Encode(groups[4])]));
+            return sections;
+        }
+
         long indexEnd = bounds.BufferBase + layout.SplitAt;
         long poolEnd = bounds.PoolAt + MemoryPoolSize;
         sections.Add(new RelocationSection((uint)bounds.BufferBase, (uint)layout.SplitAt, [.. RelocationEncoder.Encode(groups[1])]));

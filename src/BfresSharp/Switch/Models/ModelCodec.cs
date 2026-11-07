@@ -73,8 +73,9 @@ public static class ModelCodec
     // The vertex buffer, material and shape headers, the skeleton, the dictionaries and then what each section points to.
     public static void WriteBody(SwitchWriter writer, ResModel model, Slots slots, SwitchBufferLayout layout)
     {
-        // With user data every array is pointed at, even an empty one.
-        bool any = model.UserData.Count > 0;
+        // With user data every array (and from version 10 only with some geometry) is pointed at, even an empty one.
+        bool geometry = model.Shapes.Count > 0 || model.Materials.Count > 0 || model.VertexBuffers.Count > 0;
+        bool any = model.UserData.Count > 0 && (geometry || writer.Profile.Version.Major < 10);
         if (any || model.VertexBuffers.Count > 0) writer.Align(8).Resolve(slots.VertexBuffers);
         var bufferPositions = new List<int>();
         var bufferSlots = new List<VertexBufferCodec.Slots>();
@@ -90,7 +91,6 @@ public static class ModelCodec
         if (any || model.Shapes.Count > 0) writer.Align(8).Resolve(slots.Shapes);
         var shapeSlots = model.Shapes.Values.Select((shape, index) => ShapeCodec.WriteHeader(writer, shape, bufferPositions[shape.VertexBufferIndex], index)).ToList();
         // An empty user data array is only pointed at when the model has geometry before it.
-        bool geometry = model.Shapes.Count > 0 || model.Materials.Count > 0 || model.VertexBuffers.Count > 0;
         int[] userSlots = geometry || model.UserData.Count > 0 ? UserDataCodec.WriteArray(writer, model.UserData, slots.UserArray) : [];
         writer.Align(8).Resolve(slots.Skeleton);
         var skeletonSlots = SkeletonCodec.WriteHeader(writer, model.Skeleton);

@@ -17,6 +17,8 @@ public static class VertexBufferCodec
     private const int RecordSize = 16;
     private const int BufferInfoWords = 9;
     private const int StridePadding = 32;
+    private const uint FvtxMagic = 0x58545646;
+    private const int BlankIndexAt = 0x4E;
 
     public static int Size(SwitchProfile profile) => profile.Modern ? 0x58 : 0x60;
 
@@ -24,6 +26,7 @@ public static class VertexBufferCodec
     {
         var view = reader.View;
         long fields = at + (reader.Profile.Modern ? 8 : 0x10);
+        if (view.U32(at) != FvtxMagic) return new VertexBuffer { IsBlank = true };
         var buffer = new VertexBuffer
         {
             Flags = reader.Profile.Modern ? view.U32(at + 4) : 0,
@@ -55,6 +58,13 @@ public static class VertexBufferCodec
 
     public static Slots WriteHeader(SwitchWriter writer, VertexBuffer buffer, int index, uint streamOffset)
     {
+        if (buffer.IsBlank)
+        {
+            // Only the index of the record is filled in.
+            writer.Out.Zeros(BlankIndexAt).U16((ushort)index).Zeros(Size(writer.Profile) - BlankIndexAt - 2);
+            return default;
+        }
+
         writer.Out.Bytes("FVTX"u8);
         if (writer.Profile.Modern) writer.Out.U32(buffer.Flags);
         else writer.Out.Zeros(12);
@@ -72,6 +82,7 @@ public static class VertexBufferCodec
     // The attribute records, the unused buffer info, the size and stride records, padding and the attribute dictionary.
     public static void WriteBody(SwitchWriter writer, VertexBuffer buffer, Slots slots)
     {
+        if (buffer.IsBlank) return;
         writer.Align(8).Resolve(slots.Attributes);
         foreach (VertexAttrib attrib in buffer.Attributes.Values) WriteAttrib(writer, attrib);
         writer.Align(8).Resolve(slots.Unknown);

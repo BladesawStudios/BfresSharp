@@ -39,8 +39,7 @@ public static class MaterialV10Writer
         return slots;
     }
 
-    // Writes the body up to the sampler dictionary and returns the slots of the user data values.
-    public static int[] WriteBody(SwitchWriter writer, Material material, Slots slots, ShaderAssignSet assigns)
+    public static void WriteBody(SwitchWriter writer, Material material, Slots slots, ShaderAssignSet assigns)
     {
         WriteRenderInfos(writer, material, slots);
         if (material.TextureRefs.Count > 0) WriteZeros(writer, slots.TextureTable, material.TextureRefs.Count * 8);
@@ -75,14 +74,10 @@ public static class MaterialV10Writer
         WriteTextureNames(writer, material, slots);
         writer.Align(8).Resolve(slots.Info);
         ShaderInfoCodec.Write(writer, material, assigns.PositionOf(material));
+        UserDataCodec.WriteValuesAligned(writer, material.UserData, userSlots);
         if (material.Samplers.Count > 0) SwitchDictCodec.WriteAt(writer, slots.SamplerDict, material.Samplers);
+        UserDataCodec.WriteDict(writer, material.UserData, slots.UserDict);
 
-        return userSlots;
-    }
-
-    public static void WriteUserData(SwitchWriter writer, Material material, Slots slots, int[] userSlots)
-    {
-        UserDataCodec.WriteDictAndValues(writer, material.UserData, slots.UserDict, userSlots);
     }
 
     private static void WriteRenderInfos(SwitchWriter writer, Material material, Slots slots)

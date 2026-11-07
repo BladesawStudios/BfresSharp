@@ -7,6 +7,9 @@ namespace BfresSharp.Model.Geometry;
 /// </remarks>
 public sealed class VertexBuffer
 {
+    // Some Switch 2 shapes point at a vertex buffer record that is all zeros.
+    public bool IsBlank { get; set; }
+
     public uint VertexCount { get; set; }
 
     public byte VertexSkinCount { get; set; }
