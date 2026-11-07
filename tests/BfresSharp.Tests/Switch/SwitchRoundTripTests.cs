@@ -16,6 +16,7 @@ public sealed class SwitchRoundTripTests(ITestOutputHelper output)
     {
         int roundTripped = 0, unsupported = 0, failed = 0;
         var failures = new List<string>();
+        var failedNames = new List<string>();
         foreach (string folder in GameFiles.Folders)
         {
             foreach ((string name, byte[] data) in GameFiles.BfresFiles(folder))
@@ -34,10 +35,17 @@ public sealed class SwitchRoundTripTests(ITestOutputHelper output)
 
                 string? difference = ByteDiff.Describe(data, SwitchFileWriter.Write(file));
                 if (difference is null) roundTripped++;
-                else if (++failed > 0 && failures.Count < FailureLimit) failures.Add($"{name} {header.Version}: {difference}");
+                else
+                {
+                    failed++;
+                    failedNames.Add(name);
+                    if (failures.Count < FailureLimit) failures.Add($"{name} {header.Version}: {difference}");
+                }
             }
         }
 
+        // A full run refreshes the list that BFRES_ONLY_FAILED reruns read.
+        if (GameFiles.FailedFile is { } list && Environment.GetEnvironmentVariable("BFRES_ONLY_FAILED") is null) File.WriteAllLines(list, failedNames);
         output.WriteLine($"round tripped {roundTripped}, not yet readable {unsupported}, failed {failed}");
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }

@@ -17,6 +17,16 @@ internal static class GameFiles
     // BFRES_CORPUS_STRIDE=n keeps every n-th file, for quick runs.
     internal static int Stride => int.TryParse(Environment.GetEnvironmentVariable("BFRES_CORPUS_STRIDE"), out int n) && n > 1 ? n : 1;
 
+    // BFRES_FAILED_FILE names a list of relative paths that earlier runs failed; with BFRES_ONLY_FAILED set, only those are read.
+    internal static string? FailedFile => Environment.GetEnvironmentVariable("BFRES_FAILED_FILE");
+
+    private static HashSet<string>? OnlyFailed()
+    {
+        string? path = FailedFile;
+        if (path is null || Environment.GetEnvironmentVariable("BFRES_ONLY_FAILED") is null || !File.Exists(path)) return null;
+        return File.ReadAllLines(path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
     internal static IReadOnlyList<string> Folders
     {
         get
@@ -30,7 +40,8 @@ internal static class GameFiles
     {
         using ZsDic? zs = FindRomfs(folder) is { } romfs ? ZsDic.FromRomfs(romfs) : null;
         int stride = Stride;
-        foreach (string path in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Where(IsBfresName).Where((_, index) => index % stride == 0))
+        HashSet<string>? only = OnlyFailed();
+        foreach (string path in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories).Where(IsBfresName).Where((_, index) => index % stride == 0).Where(path => only is null || only.Contains(Path.GetRelativePath(folder, path))))
         {
             byte[] data = File.ReadAllBytes(path);
             if (ZsDic.IsCompressed(data)) data = zs?.Decompress(data, path) ?? data;
