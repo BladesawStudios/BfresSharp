@@ -30,6 +30,8 @@ internal static class Gx2TileModes
 
     public static bool IsMicroTiled(uint mode) => mode is Micro1dThin or Micro1dThick;
 
+    public static bool IsMacroTiled(uint mode) => mode >= Macro2dThin1;
+
     public static uint Thickness(uint mode) => mode is Micro1dThick or Macro2dThick or Macro2bThick or Macro3dThick or Macro3bThick ? 4u : 1u;
 
     public static bool IsThickMacroTiled(uint mode) => mode is Macro2dThick or Macro2bThick or Macro3dThick or Macro3bThick;
