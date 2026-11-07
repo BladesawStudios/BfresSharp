@@ -98,6 +98,7 @@ public sealed class ByteBuilder
     // Overwrites bytes at a position, extending the content with zeros first when it ends before the bytes do.
     public void SetBytes(int offset, ReadOnlySpan<byte> value)
     {
+        if (value.Length == 0) return;
         if (offset + value.Length > Length) Zeros(offset + value.Length - Length);
         value.CopyTo(_buffer.AsSpan(offset, value.Length));
     }

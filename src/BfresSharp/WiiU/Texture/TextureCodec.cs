@@ -50,7 +50,7 @@ public static class TextureCodec
         };
         for (int index = 0; index < texture.MipOffsets.Length; index++) texture.MipOffsets[index] = view.U32(at + 0x44 + index * 4L);
         for (int index = 0; index < texture.Registers.Length; index++) texture.Registers[index] = view.U32(at + 0x8C + index * 4L);
-        long data = reader.Offset(at + 0xB0), mips = reader.Offset(at + 0xB4);
+        long data = reader.LooseOffset(at + 0xB0), mips = reader.LooseOffset(at + 0xB4);
         if (data != 0) (texture.Data, texture.DataPosition) = (reader.Bytes(data, texture.DataSize), (int)data);
         if (mips != 0) (texture.MipData, texture.MipDataPosition) = (reader.Bytes(mips, texture.MipDataSize), (int)mips);
         return texture;

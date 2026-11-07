@@ -22,6 +22,11 @@ public sealed class MaterialAnimItem
 
     public ushort BeginVisualConstantIndex { get; set; }
 
+    // Wii U files also state the index of the first parameter entry and, for patterns, the base value of each entry.
+    public int InfoIndex { get; set; }
+
+    public ushort[] BaseDataList { get; set; } = [];
+
     public List<ParamAnimInfo> ParamAnimInfos { get; set; } = [];
 
     public List<PatternAnimInfo> PatternAnimInfos { get; set; } = [];

@@ -140,6 +140,15 @@ public static class CurveData
         }
     }
 
+    // The array that holds the keys, which a writer can use to tell one curve's keys from another's.
+    public static object KeyBlock(AnimCurve curve)
+    {
+        if (UsesCompressedData(curve)) return curve.CompressedKeyData;
+        if (curve.CurveType == AnimCurveType.StepBool && curve.KeyType == AnimCurveKeyType.Single) return curve.BoolKeys;
+        if (curve.CurveType == AnimCurveType.StepInt && curve.KeyType == AnimCurveKeyType.Single) return curve.IntKeys;
+        return curve.Keys;
+    }
+
     public static void WriteKeys(ByteBuilder output, AnimCurve curve)
     {
         if (UsesCompressedData(curve)) output.Bytes(curve.CompressedKeyData);

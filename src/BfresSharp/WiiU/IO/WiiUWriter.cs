@@ -99,9 +99,9 @@ public sealed class WiiUWriter(uint version, int alignment)
     }
 
     // Registers the records of a list that have no identity of their own (small value records).
-    public void Records<T>(IReadOnlyList<T> list, Action<T, int> write)
+    public void Records<T>(IReadOnlyList<T> list, Action<T, int> write, bool pointWhenEmpty = false)
     {
-        Group(list, false, (element, index) => new Entry(index, () => write(element, Index)));
+        Group(list, pointWhenEmpty, (element, index) => new Entry(index, () => write(element, Index)));
     }
 
     // Registers arbitrary data (an array of numbers, say); null writes no offset.
