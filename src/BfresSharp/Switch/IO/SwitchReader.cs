@@ -20,6 +20,9 @@ public sealed class SwitchReader(ByteView view, SwitchProfile profile)
 
     public SwitchProfile Profile { get; } = profile;
 
+    // Where the buffer data section starts; mesh and vertex buffer offsets are relative to it.
+    public long BufferBase { get; set; }
+
     public long Pointer(long at)
     {
         ulong value = View.U64(at);

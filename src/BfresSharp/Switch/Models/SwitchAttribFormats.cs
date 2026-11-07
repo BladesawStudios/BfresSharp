@@ -1,6 +1,6 @@
 using BfresSharp.Gx2;
 
-namespace BfresSharp.Switch.Model;
+namespace BfresSharp.Switch.Models;
 
 /// <summary>Maps the vertex attribute formats of the GX2 enumeration to the values Switch files store.</summary>
 /// <remarks>

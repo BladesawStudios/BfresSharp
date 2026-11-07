@@ -4,6 +4,7 @@ using BfresSharp.Errors;
 using BfresSharp.Model;
 using BfresSharp.Model.Animation;
 using BfresSharp.Switch.Animation;
+using BfresSharp.Switch.Models;
 
 namespace BfresSharp.Switch.IO;
 
@@ -42,7 +43,9 @@ public static class SwitchFileReader
             file.SavedFlags = view.U8(layout.Flags + 1);
         }
 
-        RequireEmpty(reader, SwitchRootLayout.Models, view.U16(layout.Counts), "models");
+        long bufferInfo = reader.Pointer(layout.BufferInfo);
+        if (bufferInfo != 0) reader.BufferBase = (long)view.U64(bufferInfo + 8);
+        file.Models = reader.ReadDict(SwitchRootLayout.ModelDict, SwitchRootLayout.Models, ModelCodec.Size(profile), at => ModelCodec.Read(reader, at));
         int counts = layout.AnimCounts;
         file.SkeletalAnims = reader.ReadDict(layout.SkeletalAnims + 8, layout.SkeletalAnims, SkeletalAnimCodec.Size(profile), at => SkeletalAnimCodec.Read(reader, at));
         RequireEmpty(reader, layout.MaterialAnims, view.U16(counts + 2), "material animations");
