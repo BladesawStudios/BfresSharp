@@ -8,90 +8,121 @@ namespace BfresSharp.Dictionaries;
 /// Treats each key as a big-endian number made of its UTF-8 bytes, so bit 0 is the lowest bit of the last byte, and
 /// adds the keys one at a time to a Patricia trie. A node's reference is the number of the bit it tests, and its two
 /// children are the nodes followed when that bit is clear or set. The root tests no bit and has reference
-/// 0xFFFFFFFF.
+/// 0xFFFFFFFF. The nodes live in parallel arrays and the keys share one buffer, so a tree costs a handful of
+/// allocations however many keys it has.
 /// </remarks>
 public sealed class SwitchDictTreeBuilder : IDictTreeBuilder
 {
     public IReadOnlyList<DictNode> Build(IReadOnlyList<string> keys)
     {
-        var root = new TrieNode([], -1, null);
-        var nodes = new List<TrieNode> { root };
-        foreach (string key in keys)
-        {
-            TrieNode created = Insert(root, Encoding.UTF8.GetBytes(key));
-            created.Index = nodes.Count;
-            nodes.Add(created);
-        }
+        var trie = new Trie(keys);
+        for (int key = 0; key < keys.Count; key++) trie.Insert(key + 1);
 
-        var built = new List<DictNode>(nodes.Count);
-        for (int index = 0; index < nodes.Count; index++)
+        var built = new DictNode[keys.Count + 1];
+        for (int index = 0; index <= keys.Count; index++)
         {
-            TrieNode node = nodes[index];
-            built.Add(new DictNode(
-                unchecked((uint)node.BitIndex),
-                (ushort)node.Child[0].Index,
-                (ushort)node.Child[1].Index,
-                index == 0 ? null : keys[index - 1]));
+            built[index] = new DictNode(unchecked((uint)trie.BitIndex[index]), (ushort)trie.Child[index * 2], (ushort)trie.Child[index * 2 + 1], index == 0 ? null : keys[index - 1]);
         }
 
         return built;
     }
 
-    private static TrieNode Insert(TrieNode root, byte[] data)
+    // The nodes of the trie, numbered as the keys are: node 0 is the root and node n holds the n-th key.
+    private sealed class Trie
     {
-        TrieNode current = Search(root, data);
-        int bitIndex = Mismatch(current.Data, data);
-        while (bitIndex < current.Parent.BitIndex) current = current.Parent;
+        private readonly byte[] _bytes;
+        private readonly int[] _start;
+        private readonly int[] _length;
+        private readonly int[] _parent;
 
-        TrieNode created;
-        if (bitIndex < current.BitIndex)
+        public Trie(IReadOnlyList<string> keys)
         {
-            created = new TrieNode(data, bitIndex, current.Parent);
-            created.Child[Bit(data, bitIndex) ^ 1] = current;
-            current.Parent.Child[Bit(data, current.Parent.BitIndex)] = created;
-            current.Parent = created;
-        }
-        else if (bitIndex > current.BitIndex)
-        {
-            created = new TrieNode(data, bitIndex, current);
-            created.Child[Bit(data, bitIndex) ^ 1] = Bit(current.Data, bitIndex) == (Bit(data, bitIndex) ^ 1) ? current : root;
-            current.Child[Bit(data, current.BitIndex)] = created;
-        }
-        else
-        {
-            TrieNode existing = current.Child[Bit(data, bitIndex)];
-            int newBit = existing != root ? Mismatch(existing.Data, data) : LowestSetBit(data);
-            created = new TrieNode(data, newBit, current);
-            created.Child[Bit(data, newBit) ^ 1] = existing;
-            current.Child[Bit(data, bitIndex)] = created;
+            int count = keys.Count + 1;
+            _start = new int[count + 1];
+            for (int index = 1; index < count; index++) _start[index + 1] = _start[index] + Encoding.UTF8.GetByteCount(keys[index - 1]);
+            _bytes = new byte[_start[count]];
+            _length = new int[count];
+            for (int index = 1; index < count; index++)
+            {
+                _length[index] = Encoding.UTF8.GetBytes(keys[index - 1], _bytes.AsSpan(_start[index], _start[index + 1] - _start[index]));
+            }
+
+            BitIndex = new int[count];
+            BitIndex[0] = -1;
+            _parent = new int[count];
+            Child = new int[count * 2];
         }
 
-        return created;
+        public int[] BitIndex { get; }
+
+        // Two entries per node: the child followed when the tested bit is clear and the one followed when it is set.
+        public int[] Child { get; }
+
+        public void Insert(int node)
+        {
+            ReadOnlySpan<byte> data = DataOf(node);
+            int current = Search(data);
+            int bitIndex = Mismatch(DataOf(current), data);
+            while (bitIndex < BitIndex[_parent[current]]) current = _parent[current];
+
+            if (bitIndex < BitIndex[current])
+            {
+                Create(node, bitIndex, _parent[current]);
+                Child[node * 2 + (Bit(data, bitIndex) ^ 1)] = current;
+                Child[_parent[current] * 2 + Bit(data, BitIndex[_parent[current]])] = node;
+                _parent[current] = node;
+            }
+            else if (bitIndex > BitIndex[current])
+            {
+                Create(node, bitIndex, current);
+                Child[node * 2 + (Bit(data, bitIndex) ^ 1)] = Bit(DataOf(current), bitIndex) == (Bit(data, bitIndex) ^ 1) ? current : 0;
+                Child[current * 2 + Bit(data, BitIndex[current])] = node;
+            }
+            else
+            {
+                int existing = Child[current * 2 + Bit(data, bitIndex)];
+                int newBit = existing != 0 ? Mismatch(DataOf(existing), data) : LowestSetBit(data);
+                Create(node, newBit, current);
+                Child[node * 2 + (Bit(data, newBit) ^ 1)] = existing;
+                Child[current * 2 + Bit(data, bitIndex)] = node;
+            }
+        }
+
+        private ReadOnlySpan<byte> DataOf(int node) => _bytes.AsSpan(_start[node], _length[node]);
+
+        // A new node starts with both children pointing back at itself.
+        private void Create(int node, int bitIndex, int parent)
+        {
+            BitIndex[node] = bitIndex;
+            _parent[node] = parent;
+            Child[node * 2] = node;
+            Child[node * 2 + 1] = node;
+        }
+
+        // The last node reached before the walk loops back up the tree.
+        private int Search(ReadOnlySpan<byte> data)
+        {
+            if (Child[0] == 0) return 0;
+            int node = Child[0];
+            int previous;
+            do
+            {
+                previous = node;
+                node = Child[node * 2 + Bit(data, BitIndex[node])];
+            }
+            while (BitIndex[node] > BitIndex[previous]);
+            return previous;
+        }
     }
 
-    // The last node reached before the walk loops back up the tree.
-    private static TrieNode Search(TrieNode root, byte[] data)
-    {
-        if (root.Child[0] == root) return root;
-        TrieNode node = root.Child[0];
-        TrieNode previous;
-        do
-        {
-            previous = node;
-            node = node.Child[Bit(data, node.BitIndex)];
-        }
-        while (node.BitIndex > previous.BitIndex);
-        return previous;
-    }
-
-    private static int Bit(byte[] data, int bit)
+    private static int Bit(ReadOnlySpan<byte> data, int bit)
     {
         if (bit < 0) return 0;
         int fromEnd = bit >> 3;
         return fromEnd < data.Length ? (data[data.Length - 1 - fromEnd] >> (bit & 7)) & 1 : 0;
     }
 
-    private static int Mismatch(byte[] a, byte[] b)
+    private static int Mismatch(ReadOnlySpan<byte> a, ReadOnlySpan<byte> b)
     {
         int length = Math.Max(a.Length, b.Length);
         for (int fromEnd = 0; fromEnd < length; fromEnd++)
@@ -103,7 +134,7 @@ public sealed class SwitchDictTreeBuilder : IDictTreeBuilder
         return -1;
     }
 
-    private static int LowestSetBit(byte[] data)
+    private static int LowestSetBit(ReadOnlySpan<byte> data)
     {
         for (int fromEnd = 0; fromEnd < data.Length; fromEnd++)
         {
@@ -114,26 +145,5 @@ public sealed class SwitchDictTreeBuilder : IDictTreeBuilder
         throw new InvalidOperationException("An empty key has no bit set.");
     }
 
-    private static int ByteFromEnd(byte[] data, int fromEnd) => fromEnd < data.Length ? data[data.Length - 1 - fromEnd] : 0;
-
-    private sealed class TrieNode
-    {
-        public TrieNode(byte[] data, int bitIndex, TrieNode? parent)
-        {
-            Data = data;
-            BitIndex = bitIndex;
-            Parent = parent ?? this;
-            Child = [this, this];
-        }
-
-        public byte[] Data { get; }
-
-        public int Index { get; set; }
-
-        public int BitIndex { get; }
-
-        public TrieNode Parent { get; set; }
-
-        public TrieNode[] Child { get; }
-    }
+    private static int ByteFromEnd(ReadOnlySpan<byte> data, int fromEnd) => fromEnd < data.Length ? data[data.Length - 1 - fromEnd] : 0;
 }
