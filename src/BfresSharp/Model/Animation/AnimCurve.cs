@@ -12,6 +12,7 @@ public sealed class AnimCurve
 {
     public const ushort CompressedFlag = 0x4000;
 
+    private static readonly float[,] NoKeys = new float[0, 0];
     private const ushort FrameTypeMask = 0b11;
     private const ushort KeyTypeMask = 0b1100;
     private const ushort CurveTypeMask = 0b111_0000;
@@ -67,7 +68,7 @@ public sealed class AnimCurve
 
     public float[] Frames { get; set; } = [];
 
-    public float[,] Keys { get; set; } = new float[0, 0];
+    public float[,] Keys { get; set; } = NoKeys;
 
     public int[] IntKeys { get; set; } = [];
 
