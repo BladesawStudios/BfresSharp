@@ -13,7 +13,6 @@
 
 ## Later
 
-- TotK `.bfres.mc` through McSharp.
 - Platform converters (Wii U to Switch and back).
 - TextConvert JSON and text.
 - Helpers, `Half` and `Decimal10x5`.

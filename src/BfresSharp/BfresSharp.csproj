@@ -11,6 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\lib\vendor\McSharp\src\McSharp\McSharp.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="BfresSharp.Tests" />
   </ItemGroup>
 
