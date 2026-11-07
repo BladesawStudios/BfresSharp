@@ -48,6 +48,44 @@ public static class CurveCodec
         return curve;
     }
 
+    public static List<AnimCurve> ReadList(SwitchReader reader, long at, int count)
+    {
+        return reader.ReadArray(at, count, HeaderSize, offset => Read(reader, offset)).ToList();
+    }
+
+    // Writes a section's curve headers and points the slot at them; the slots returned feed WriteData.
+    public static List<(int Frames, int Keys)> WriteHeaders(SwitchWriter writer, IReadOnlyList<AnimCurve> curves, int slot)
+    {
+        var slots = new List<(int Frames, int Keys)>();
+        if (curves.Count == 0) return slots;
+        writer.Align(8).Resolve(slot);
+        foreach (AnimCurve curve in curves)
+        {
+            WriteHeader(writer, curve, out int frames, out int keys);
+            slots.Add((frames, keys));
+        }
+
+        return slots;
+    }
+
+    // Writes each curve's frames and then its keys, each padded to 8 bytes.
+    public static void WriteData(SwitchWriter writer, IReadOnlyList<AnimCurve> curves, List<(int Frames, int Keys)> slots)
+    {
+        for (int index = 0; index < curves.Count; index++)
+        {
+            writer.Resolve(slots[index].Frames);
+            WriteFrames(writer, curves[index]);
+            writer.Align(8).Resolve(slots[index].Keys);
+            WriteKeys(writer, curves[index]);
+            writer.Align(8);
+        }
+    }
+
+    public static void WriteList(SwitchWriter writer, IReadOnlyList<AnimCurve> curves, int slot)
+    {
+        WriteData(writer, curves, WriteHeaders(writer, curves, slot));
+    }
+
     public static void WriteHeader(SwitchWriter writer, AnimCurve curve, out int framesSlot, out int keysSlot)
     {
         framesSlot = writer.Pointer();

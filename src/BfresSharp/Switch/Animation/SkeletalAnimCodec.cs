@@ -87,23 +87,7 @@ public static class SkeletalAnimCodec
             BoneAnimCodec.WriteBase(writer, bone);
         }
 
-        if (bone.Curves.Count == 0) return;
-        writer.Align(8).Resolve(slots.Curves);
-        var curveSlots = new List<(int Frames, int Keys)>();
-        foreach (AnimCurve curve in bone.Curves)
-        {
-            CurveCodec.WriteHeader(writer, curve, out int frames, out int keys);
-            curveSlots.Add((frames, keys));
-        }
-
-        for (int index = 0; index < bone.Curves.Count; index++)
-        {
-            writer.Resolve(curveSlots[index].Frames);
-            CurveCodec.WriteFrames(writer, bone.Curves[index]);
-            writer.Align(8).Resolve(curveSlots[index].Keys);
-            CurveCodec.WriteKeys(writer, bone.Curves[index]);
-            writer.Align(8);
-        }
+        CurveCodec.WriteList(writer, bone.Curves, slots.Curves);
     }
 
     public readonly record struct Slots(int BindIndices, int BoneAnims, int UserArray, int UserDict);

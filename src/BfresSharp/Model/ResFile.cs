@@ -34,4 +34,6 @@ public sealed class ResFile
     public List<string> StringOrder { get; set; } = [];
 
     public ResDict<SkeletalAnim> SkeletalAnims { get; set; } = new();
+
+    public ResDict<VisibilityAnim> VisibilityAnims { get; set; } = new();
 }
