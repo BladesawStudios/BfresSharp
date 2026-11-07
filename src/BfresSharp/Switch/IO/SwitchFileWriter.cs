@@ -18,6 +18,7 @@ public static class SwitchFileWriter
 {
     private const int BufferInfoSize = 0x20;
     private const int BlockOffsetField = 0x16;
+    private const int RelocationRoom = 1 << 16;
 
     public static byte[] Write(ResFile file)
     {
@@ -157,12 +158,13 @@ public static class SwitchFileWriter
     private static byte[] Finish(SwitchWriter writer, ResFile file, RootSlots root, SwitchBufferLayout layout, int bufferData, int[] externalSlots)
     {
         int stringEnd = writer.Position;
+        writer.Out.Reserve(TailSize(file, layout));
         long bufferBase = 0, poolAt = 0;
         if (!layout.IsEmpty)
         {
             writer.Align(SwitchBufferLayout.PageSize);
             bufferBase = writer.Position;
-            writer.Out.Bytes(layout.Build());
+            layout.BuildInto(writer.Out.Claim((int)layout.TotalSize));
             poolAt = writer.Position;
             writer.Out.Zeros(SwitchSectionBuilder.MemoryPoolSize);
             ResolveBuffers(writer, bufferData, bufferBase, poolAt);
@@ -179,6 +181,13 @@ public static class SwitchFileWriter
         writer.Out.SetU32(root.TableOffsetAt, (uint)tableAt);
         writer.Out.SetU32(root.FileSizeAt, (uint)writer.Position);
         return writer.Out.ToArray();
+    }
+
+    // What the buffer data, the memory pool, the embedded files and the relocation table add, with room for their padding, so the output grows once.
+    private static int TailSize(ResFile file, SwitchBufferLayout layout)
+    {
+        long external = file.ExternalFiles.Values.Sum(external => (long)external.Data.Length + SwitchBufferLayout.PageSize);
+        return (int)Math.Min(int.MaxValue / 2, layout.TotalSize + SwitchSectionBuilder.MemoryPoolSize + SwitchBufferLayout.PageSize + external + RelocationRoom);
     }
 
     private static void ResolveBuffers(SwitchWriter writer, int bufferData, long bufferBase, long poolAt)

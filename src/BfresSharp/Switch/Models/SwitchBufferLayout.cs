@@ -74,23 +74,20 @@ public sealed class SwitchBufferLayout
     public bool HasClusters => _clusters.Count > 0;
 
     // The index data and then the streams, as they are laid out in the section.
-    public byte[] Build()
+    public void BuildInto(Span<byte> bytes)
     {
-        var bytes = new byte[TotalSize];
-        foreach ((Mesh mesh, uint offset) in _faces) mesh.IndexData.CopyTo(bytes, offset);
-        foreach ((ClusterMesh cluster, uint offset) in _clusters) cluster.Data.CopyTo(bytes, offset);
+        foreach ((Mesh mesh, uint offset) in _faces) mesh.IndexData.CopyTo(bytes[(int)offset..]);
+        foreach ((ClusterMesh cluster, uint offset) in _clusters) cluster.Data.CopyTo(bytes[(int)offset..]);
         foreach (VertexBuffer buffer in Models.Values.SelectMany(model => model.VertexBuffers).Where(buffer => !buffer.IsBlank))
         {
             long position = _streams[buffer];
             foreach (VertexStream stream in buffer.Streams)
             {
                 position = Align(position, buffer.GpuBufferAlignment);
-                stream.Data.CopyTo(bytes, position);
+                stream.Data.CopyTo(bytes[(int)position..]);
                 position += stream.Data.Length;
             }
         }
-
-        return bytes;
     }
 
     private static long Align(long value, int alignment) => alignment <= 1 ? value : (value + alignment - 1) / alignment * alignment;

@@ -103,6 +103,15 @@ public sealed class ByteBuilder
         value.CopyTo(_buffer.AsSpan(offset, value.Length));
     }
 
+    // Makes room for that many more bytes at once, so a large block is not copied again by each doubling.
+    public void Reserve(int additional)
+    {
+        if (Length + additional > _buffer.Length) Array.Resize(ref _buffer, Length + additional);
+    }
+
+    // Appends that many zero bytes and returns them to be filled in place, which saves building the block apart and copying it.
+    public Span<byte> Claim(int count) => Append(count);
+
     public byte[] ToArray() => Written.ToArray();
 
     private Span<byte> Append(int count)

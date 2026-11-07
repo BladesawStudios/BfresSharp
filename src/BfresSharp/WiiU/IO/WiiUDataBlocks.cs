@@ -30,6 +30,7 @@ internal sealed class WiiUDataBlocks
     public void Write(ByteBuilder o)
     {
         if (_blocks.Count > 0) o.Align(SectionAlignment);
+        o.Reserve(_blocks.Sum(block => block.Bytes.Length));
         foreach (Block block in _blocks.OrderBy(block => block.Layout.Rank))
         {
             int position = block.Layout.Position;
