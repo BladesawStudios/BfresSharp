@@ -36,9 +36,9 @@ public sealed class RelocationTableTests
     {
         int sections = 0;
         var failures = new List<string>();
-        foreach (string folder in Corpus.Corpus.Folders)
+        foreach (string folder in GameFiles.Folders)
         {
-            foreach ((string name, byte[] data) in Corpus.Corpus.BfresFiles(folder))
+            foreach ((string name, byte[] data) in GameFiles.BfresFiles(folder))
             {
                 if (!BfresHeaderReader.TryRead(data, out BfresHeader header) || !header.Platform.UsesSwitchLayout()) continue;
                 var view = new ByteView(data, ByteOrder.Little);
@@ -70,9 +70,9 @@ public sealed class RelocationTableTests
     public void CorpusTablesWriteBackIdentically()
     {
         var failures = new List<string>();
-        foreach (string folder in Corpus.Corpus.Folders)
+        foreach (string folder in GameFiles.Folders)
         {
-            foreach ((string name, byte[] data) in Corpus.Corpus.BfresFiles(folder))
+            foreach ((string name, byte[] data) in GameFiles.BfresFiles(folder))
             {
                 if (!BfresHeaderReader.TryRead(data, out BfresHeader header) || !header.Platform.UsesSwitchLayout()) continue;
                 var view = new ByteView(data, ByteOrder.Little);

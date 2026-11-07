@@ -10,7 +10,7 @@ namespace BfresSharp.Tests.Corpus;
 /// returned decompressed: Yaz0 for BotW, zstd with the dictionaries of the nearest ancestor romfs that has them for
 /// the Switch games that compress.
 /// </remarks>
-internal static class Corpus
+internal static class GameFiles
 {
     internal const string Env = "BFRES_CORPUS";
 

@@ -8,10 +8,10 @@ public sealed class CorpusSurveyTests(ITestOutputHelper output)
     [CorpusFact]
     public void ListsPlatformsAndVersionsInTheCorpus()
     {
-        foreach (string folder in Corpus.Folders)
+        foreach (string folder in GameFiles.Folders)
         {
             var counts = new SortedDictionary<string, int>();
-            foreach ((string name, byte[] data) in Corpus.BfresFiles(folder))
+            foreach ((string name, byte[] data) in GameFiles.BfresFiles(folder))
             {
                 string key = BfresHeaderReader.TryRead(data, out BfresHeader header)
                     ? $"{header.Platform} {header.Version} align {header.DataAlignment}"
