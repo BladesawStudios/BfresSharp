@@ -33,7 +33,7 @@ public static class MaterialAnimCodec
             FrameCount = view.I32(modern ? c : c + 8),
             BakedSize = view.U32(modern ? c + 4 : c + 12),
         };
-        if (reader.Pointer(fields + 0x10) != 0) throw new BfresFormatException("A bound model inside an animation is not supported yet", fields + 0x10);
+        if (reader.Pointer(fields + 0x10) != 0) throw new BfresUnsupportedException("A bound model inside an animation is not supported yet", fields + 0x10);
 
         int items = view.U16(modern ? c + 0xA : c + 4);
         int textures = view.U16(modern ? c + 0x14 : c + 0x16);

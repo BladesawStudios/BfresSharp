@@ -28,7 +28,7 @@ public static class WiiUFileReader
         if (header.Platform != BfresPlatform.WiiU || header.ByteOrder != ByteOrder.Big)
             throw new BfresFormatException("Not a big-endian Wii U file");
         if (header.Version.Raw < MinVersion || data.Length < HeaderSize)
-            throw new BfresFormatException($"Wii U version {header.Version} is not supported");
+            throw new BfresUnsupportedException($"Wii U version {header.Version} is not supported");
 
         var reader = new WiiUReader(new ByteView(data, ByteOrder.Big), header.Version.Raw);
         var file = new ResFile
@@ -56,6 +56,6 @@ public static class WiiUFileReader
     // TODO: Remove as each section's codec is added; the check exists to refuse a file that would otherwise lose a section.
     private static void RequireEmpty(WiiUReader reader, int offsetAt, string what)
     {
-        if (reader.Offset(offsetAt) != 0) throw new BfresFormatException($"Reading {what} is not supported yet", offsetAt);
+        if (reader.Offset(offsetAt) != 0) throw new BfresUnsupportedException($"Reading {what} is not supported yet", offsetAt);
     }
 }

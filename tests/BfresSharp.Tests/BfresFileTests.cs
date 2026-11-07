@@ -21,7 +21,7 @@ public sealed class BfresFileTests(ITestOutputHelper output)
                     Assert.NotNull(BfresFile.Read(data));
                     read++;
                 }
-                catch (Errors.BfresFormatException error) when (error.Message.EndsWith(nameof(McSharp.McStatus.UnsupportedVersion)))
+                catch (Errors.BfresUnsupportedException)
                 {
                     unsupported++;
                 }

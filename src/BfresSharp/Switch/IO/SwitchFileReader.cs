@@ -64,6 +64,6 @@ public static class SwitchFileReader
     // TODO: Remove as each section's codec is added; the check exists to refuse a file that would otherwise lose a section.
     private static void RequireEmpty(SwitchReader reader, int pointerAt, int count, string what)
     {
-        if (count != 0 || reader.Pointer(pointerAt) != 0) throw new BfresFormatException($"Reading {what} is not supported yet", pointerAt);
+        if (count != 0 || reader.Pointer(pointerAt) != 0) throw new BfresUnsupportedException($"Reading {what} is not supported yet", pointerAt);
     }
 }

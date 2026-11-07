@@ -21,7 +21,7 @@ public static class MaterialCodec
     public static Material Read(SwitchReader reader, long at)
     {
         // TODO: Version 10 stores the shader assignment, render infos and parameters in a different layout.
-        if (reader.Profile.Version.Major >= 10) throw new BfresFormatException("Reading version 10 materials is not supported yet", at);
+        if (reader.Profile.Version.Major >= 10) throw new BfresUnsupportedException("Reading version 10 materials is not supported yet", at);
         var view = reader.View;
         var profile = reader.Profile;
         long fields = at + (profile.Modern ? 8 : 0x10);

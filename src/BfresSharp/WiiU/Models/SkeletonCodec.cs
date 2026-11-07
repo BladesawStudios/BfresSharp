@@ -17,7 +17,7 @@ public static class SkeletonCodec
 
     public static Skeleton Read(WiiUReader reader, long at)
     {
-        if (!reader.AtLeast(MinVersion)) throw new BfresFormatException("Skeletons before version 3.4 are not supported yet", at);
+        if (!reader.AtLeast(MinVersion)) throw new BfresUnsupportedException("Skeletons before version 3.4 are not supported yet", at);
         var view = reader.View;
         int smooth = view.U16(at + 0xA), matrices = smooth + view.U16(at + 0xC);
         var skeleton = new Skeleton { RawFlags = view.U32(at + 4), Bones = reader.ReadDict(at + 0x10, offset => BoneCodec.Read(reader, offset)) };

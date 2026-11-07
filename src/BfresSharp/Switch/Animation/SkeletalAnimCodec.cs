@@ -31,7 +31,7 @@ public static class SkeletalAnimCodec
             FrameCount = view.I32(counts),
             BakedSize = view.U32(counts + 8),
         };
-        if (reader.Pointer(fields + 0x10) != 0) throw new BfresFormatException("A bound skeleton inside an animation is not supported yet", fields + 0x10);
+        if (reader.Pointer(fields + 0x10) != 0) throw new BfresUnsupportedException("A bound skeleton inside an animation is not supported yet", fields + 0x10);
 
         int boneCount = view.U16(counts + 12);
         long bindIndices = reader.Pointer(fields + 0x18);

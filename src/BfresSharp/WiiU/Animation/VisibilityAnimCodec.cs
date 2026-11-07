@@ -18,8 +18,8 @@ public static class VisibilityAnimCodec
 
     public static VisibilityAnim Read(WiiUReader reader, long at)
     {
-        if (!reader.AtLeast(MinVersion)) throw new BfresFormatException("Visibility animations before version 3.4 are not supported yet", at);
-        if (reader.Offset(at + 0x1C) != 0) throw new BfresFormatException("A bound model inside an animation is not supported yet", at + 0x1C);
+        if (!reader.AtLeast(MinVersion)) throw new BfresUnsupportedException("Visibility animations before version 3.4 are not supported yet", at);
+        if (reader.Offset(at + 0x1C) != 0) throw new BfresUnsupportedException("A bound model inside an animation is not supported yet", at + 0x1C);
         var view = reader.View;
         int count = view.U16(at + 0x14);
         var anim = new VisibilityAnim

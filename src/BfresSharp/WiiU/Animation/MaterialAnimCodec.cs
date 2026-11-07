@@ -79,8 +79,8 @@ public static class MaterialAnimCodec
 
     private static void CheckSupported(WiiUReader reader, long at)
     {
-        if (!reader.AtLeast(MinVersion)) throw new BfresFormatException("Material animations before version 3.4 are not supported yet", at);
-        if (reader.Offset(at + 0x24) != 0) throw new BfresFormatException("A bound model inside an animation is not supported yet", at + 0x24);
+        if (!reader.AtLeast(MinVersion)) throw new BfresUnsupportedException("Material animations before version 3.4 are not supported yet", at);
+        if (reader.Offset(at + 0x24) != 0) throw new BfresUnsupportedException("A bound model inside an animation is not supported yet", at + 0x24);
     }
 
     private static MaterialAnim ReadCommon(WiiUReader reader, long at)

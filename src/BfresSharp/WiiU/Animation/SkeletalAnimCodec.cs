@@ -18,9 +18,9 @@ public static class SkeletalAnimCodec
 
     public static SkeletalAnim Read(WiiUReader reader, long at)
     {
-        if (!reader.AtLeast(MinVersion)) throw new BfresFormatException("Skeletal animations before version 3.4 are not supported yet", at);
+        if (!reader.AtLeast(MinVersion)) throw new BfresUnsupportedException("Skeletal animations before version 3.4 are not supported yet", at);
         var view = reader.View;
-        if (reader.Offset(at + 0x24) != 0) throw new BfresFormatException("A bound skeleton inside an animation is not supported yet", at + 0x24);
+        if (reader.Offset(at + 0x24) != 0) throw new BfresUnsupportedException("A bound skeleton inside an animation is not supported yet", at + 0x24);
         int boneCount = view.U16(at + 0x14);
         var anim = new SkeletalAnim
         {
