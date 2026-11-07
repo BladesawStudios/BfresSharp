@@ -13,6 +13,9 @@ namespace BfresSharp.Switch.IO;
 /// </remarks>
 public sealed class SwitchReader(ByteView view, SwitchProfile profile)
 {
+    // The magic, the linked block and the count that precede the first name of the pool.
+    private const int PoolHeaderSize = 0x14;
+
     public ByteView View { get; } = view.WithOrder(ByteOrder.Little);
 
     public SwitchProfile Profile { get; } = profile;
@@ -42,6 +45,22 @@ public sealed class SwitchReader(ByteView view, SwitchProfile profile)
         int length = View.U16(target);
         ReadOnlySpan<byte> bytes = View.Slice(target + 2, length).Span;
         return Encoding.UTF8.GetString(bytes);
+    }
+
+    // Reads the names from the first stored name to the end of the pool block in the order stored, leaving out the empty name.
+    public List<string> StringPool(long firstAt, long blockSize)
+    {
+        var names = new List<string>();
+        long at = firstAt;
+        long end = firstAt - PoolHeaderSize + blockSize;
+        while (at + 2 <= end)
+        {
+            string text = StringAtTarget(at);
+            if (text.Length > 0) names.Add(text);
+            at = (at + 2 + Encoding.UTF8.GetByteCount(text) + 1 + 1) & ~1L;
+        }
+
+        return names;
     }
 
     public IReadOnlyList<DictNode> Dictionary(long dictAt)
