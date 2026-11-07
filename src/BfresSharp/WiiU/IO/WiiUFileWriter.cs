@@ -17,7 +17,12 @@ public static class WiiUFileWriter
     private const int FileSizeAt = 0xC;
     private const int PoolSizeAt = 0x18;
 
-    public static byte[] Write(ResFile file)
+    public static byte[] Write(ResFile file) => Build(file).ToArray();
+
+    // Writes straight from the builder, which saves copying a finished file into an array first.
+    public static void Write(ResFile file, Stream destination) => destination.Write(Build(file).Written);
+
+    private static Binary.ByteBuilder Build(ResFile file)
     {
         var writer = new WiiUWriter(file.Version.Raw, (int)file.DataAlignment);
         var o = writer.Out;
@@ -52,7 +57,7 @@ public static class WiiUFileWriter
         o.SetU32(FileSizeAt, (uint)o.Length);
         o.SetU32(PoolSizeAt, (uint)writer.Pool.Size);
         o.SetU32(PoolSizeAt + 4, (uint)(writer.Pool.Start - (PoolSizeAt + 4)));
-        return o.ToArray();
+        return o;
     }
 
     private static void WriteCounts(Binary.ByteBuilder o, ResFile file)

@@ -20,7 +20,12 @@ public static class SwitchFileWriter
     private const int BlockOffsetField = 0x16;
     private const int RelocationRoom = 1 << 16;
 
-    public static byte[] Write(ResFile file)
+    public static byte[] Write(ResFile file) => Build(file).ToArray();
+
+    // Writes straight from the builder, which saves copying a finished file into an array first.
+    public static void Write(ResFile file, Stream destination) => destination.Write(Build(file).Written);
+
+    private static Binary.ByteBuilder Build(ResFile file)
     {
         var writer = new SwitchWriter(SwitchProfile.For(file.Version));
         var layout = new SwitchBufferLayout(file);
@@ -155,7 +160,7 @@ public static class SwitchFileWriter
         return start;
     }
 
-    private static byte[] Finish(SwitchWriter writer, ResFile file, RootSlots root, SwitchBufferLayout layout, int bufferData, int[] externalSlots)
+    private static Binary.ByteBuilder Finish(SwitchWriter writer, ResFile file, RootSlots root, SwitchBufferLayout layout, int bufferData, int[] externalSlots)
     {
         int stringEnd = writer.Position;
         writer.Out.Reserve(TailSize(file, layout));
@@ -180,7 +185,7 @@ public static class SwitchFileWriter
         PatchBlocks(writer, tableAt);
         writer.Out.SetU32(root.TableOffsetAt, (uint)tableAt);
         writer.Out.SetU32(root.FileSizeAt, (uint)writer.Position);
-        return writer.Out.ToArray();
+        return writer.Out;
     }
 
     // What the buffer data, the memory pool, the embedded files and the relocation table add, with room for their padding, so the output grows once.
