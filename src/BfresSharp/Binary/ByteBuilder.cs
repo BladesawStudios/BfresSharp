@@ -95,6 +95,13 @@ public sealed class ByteBuilder
         else BinaryPrimitives.WriteUInt64BigEndian(span, value);
     }
 
+    // Overwrites bytes at a position, extending the content with zeros first when it ends before the bytes do.
+    public void SetBytes(int offset, ReadOnlySpan<byte> value)
+    {
+        if (offset + value.Length > Length) Zeros(offset + value.Length - Length);
+        value.CopyTo(_buffer.AsSpan(offset, value.Length));
+    }
+
     public byte[] ToArray() => Written.ToArray();
 
     private Span<byte> Append(int count)

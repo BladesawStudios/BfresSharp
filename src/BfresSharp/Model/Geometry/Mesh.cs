@@ -23,6 +23,13 @@ public sealed class Mesh
 
     public uint FirstVertex { get; set; }
 
+    // The index format, stride and copy count a Wii U file states for the index buffer, kept as read.
+    public GX2IndexFormat Gx2IndexFormat { get; set; } = GX2IndexFormat.UInt16;
+
+    public ushort IndexStride { get; set; }
+
+    public ushort IndexBufferCount { get; set; } = 1;
+
     public uint BufferFlags { get; set; }
 
     public List<SubMesh> SubMeshes { get; set; } = [];

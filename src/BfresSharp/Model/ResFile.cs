@@ -23,6 +23,9 @@ public sealed class ResFile
 
     public byte Alignment { get; set; }
 
+    // Wii U files state their data alignment directly rather than as a power of two.
+    public uint DataAlignment { get; set; }
+
     public byte TargetAddressSize { get; set; }
 
     public ushort Flag { get; set; }
@@ -47,4 +50,18 @@ public sealed class ResFile
     public ResDict<VisibilityAnim> VisibilityAnims { get; set; } = new();
 
     public ResDict<ShapeAnim> ShapeAnims { get; set; } = new();
+
+    // Wii U files hold their textures and keep each kind of material animation, and the visibility animations of
+    // materials, in a dictionary of their own.
+    public ResDict<Texture.Texture> Textures { get; set; } = new();
+
+    public ResDict<MaterialAnim> ShaderParamAnims { get; set; } = new();
+
+    public ResDict<MaterialAnim> ColorAnims { get; set; } = new();
+
+    public ResDict<MaterialAnim> TexSrtAnims { get; set; } = new();
+
+    public ResDict<MaterialAnim> TexPatternAnims { get; set; } = new();
+
+    public ResDict<VisibilityAnim> MatVisibilityAnims { get; set; } = new();
 }

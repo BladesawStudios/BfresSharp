@@ -76,6 +76,9 @@ public sealed class Sampler
 
     public float LodBias { get; set; }
 
+    // The three GX2 sampler registers a Wii U file stores, kept as read; empty for samplers read from a Switch file.
+    public uint[] Registers { get; set; } = [];
+
     public TexFilter Mip
     {
         get => (TexFilter)(FilterFlags & MipMask);

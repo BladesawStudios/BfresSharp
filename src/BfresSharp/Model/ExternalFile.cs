@@ -4,4 +4,7 @@ namespace BfresSharp.Model;
 public sealed class ExternalFile
 {
     public byte[] Data { get; set; } = [];
+
+    // Where a Wii U file kept the data, or -1; kept so that a file whose data overlaps or sits at a fixed place writes back the same.
+    public int DataPosition { get; set; } = -1;
 }
