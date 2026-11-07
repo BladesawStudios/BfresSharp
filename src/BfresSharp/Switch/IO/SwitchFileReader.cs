@@ -4,6 +4,7 @@ using BfresSharp.Errors;
 using BfresSharp.Model;
 using BfresSharp.Model.Animation;
 using BfresSharp.Switch.Animation;
+using BfresSharp.Switch.Common;
 using BfresSharp.Switch.Models;
 
 namespace BfresSharp.Switch.IO;
@@ -52,7 +53,7 @@ public static class SwitchFileReader
         file.VisibilityAnims = reader.ReadDict(layout.BoneVisibilityAnims + 8, layout.BoneVisibilityAnims, VisibilityAnimCodec.Size(profile), at => VisibilityAnimCodec.Read(reader, at));
         RequireEmpty(reader, layout.ShapeAnims, view.U16(counts + 6), "shape animations");
         RequireEmpty(reader, layout.SceneAnims, view.U16(counts + 8), "scene animations");
-        RequireEmpty(reader, layout.ExternalFiles, view.U16(counts + 10), "external files");
+        file.ExternalFiles = reader.ReadDict(layout.ExternalFiles + 8, layout.ExternalFiles, ExternalFileCodec.Size, at => ExternalFileCodec.Read(reader, at));
         return file;
     }
 

@@ -1,6 +1,7 @@
 using BfresSharp.Container;
 using BfresSharp.Model;
 using BfresSharp.Switch.Animation;
+using BfresSharp.Switch.Common;
 using BfresSharp.Switch.Models;
 using BfresSharp.Switch.Relocation;
 
@@ -17,7 +18,6 @@ public static class SwitchFileWriter
 {
     private const int BufferInfoSize = 0x20;
     private const int BlockOffsetField = 0x16;
-    private const int MemoryPoolSize = 288;
 
     public static byte[] Write(ResFile file)
     {
@@ -32,15 +32,18 @@ public static class SwitchFileWriter
         if (file.VisibilityAnims.Count > 0) writer.Resolve(root.VisibilityAnims);
         var visibility = file.VisibilityAnims.Values.Select(anim => VisibilityAnimCodec.WriteHeader(writer, anim)).ToList();
         int bufferData = WriteBufferInfo(writer, root, layout);
+        if (file.ExternalFiles.Count > 0) writer.Align(8).Resolve(root.ExternalFiles);
+        int[] externalSlots = ExternalFileCodec.WriteEntries(writer, file.ExternalFiles);
         WriteDictionary(writer, root.ModelDict, file.Models);
         WriteDictionary(writer, root.SkeletalAnimDict, file.SkeletalAnims);
         WriteDictionary(writer, root.VisibilityAnimDict, file.VisibilityAnims);
+        WriteDictionary(writer, root.ExternalFileDict, file.ExternalFiles);
         for (int index = 0; index < models.Count; index++) ModelCodec.WriteBody(writer, file.Models.Values[index], models[index], layout);
         for (int index = 0; index < skeletal.Count; index++) SkeletalAnimCodec.WriteBody(writer, file.SkeletalAnims.Values[index], skeletal[index]);
         for (int index = 0; index < visibility.Count; index++) VisibilityAnimCodec.WriteBody(writer, file.VisibilityAnims.Values[index], visibility[index]);
 
         int poolStart = WriteStringPool(writer, file, root);
-        return Finish(writer, file, root, layout, bufferData);
+        return Finish(writer, file, root, layout, bufferData, externalSlots);
     }
 
     private static RootSlots WriteHeader(SwitchWriter writer, ResFile file, SwitchBufferLayout layout)
@@ -77,17 +80,17 @@ public static class SwitchFileWriter
         else if (writer.Profile.Modern && file.Platform != BfresPlatform.Switch2) writer.Pointer();
         else writer.Unlisted();
         int bufferInfo = layout.IsEmpty ? writer.Unlisted() : writer.Pointer();
-        SectionArray(writer, present: false);
-        writer.Pointer();
+        int externalArray = SectionArray(writer, file.ExternalFiles.Count > 0);
+        int externalDict = writer.Pointer();
         writer.Unlisted();
         int stringTable = writer.Pointer();
         int poolSize = writer.Position;
         o.U32(0).U16((ushort)file.Models.Count);
         if (writer.Profile.Modern) o.U16(0).U16(0);
-        o.U16((ushort)file.SkeletalAnims.Count).U16(0).U16((ushort)file.VisibilityAnims.Count).U16(0).U16(0).U16(0);
+        o.U16((ushort)file.SkeletalAnims.Count).U16(0).U16((ushort)file.VisibilityAnims.Count).U16(0).U16(0).U16((ushort)file.ExternalFiles.Count);
         if (writer.Profile.Modern) o.U8(file.ExternalFlags).U8(file.SavedFlags);
         else o.Zeros(6);
-        return new RootSlots(nameOffset, tableOffset, fileSize, modelArray, modelDict, skeletalArray, skeletalDict, visibilityArray, visibilityDict, bufferInfo, stringTable, poolSize);
+        return new RootSlots(nameOffset, tableOffset, fileSize, modelArray, modelDict, skeletalArray, skeletalDict, visibilityArray, visibilityDict, bufferInfo, externalArray, externalDict, stringTable, poolSize);
     }
 
     // Files before version 9 list an array pointer in the relocation table only when the array exists.
@@ -133,7 +136,7 @@ public static class SwitchFileWriter
         return start;
     }
 
-    private static byte[] Finish(SwitchWriter writer, ResFile file, RootSlots root, SwitchBufferLayout layout, int bufferData)
+    private static byte[] Finish(SwitchWriter writer, ResFile file, RootSlots root, SwitchBufferLayout layout, int bufferData, int[] externalSlots)
     {
         int stringEnd = writer.Position;
         long bufferBase = 0, poolAt = 0;
@@ -143,13 +146,15 @@ public static class SwitchFileWriter
             bufferBase = writer.Position;
             writer.Out.Bytes(layout.Build());
             poolAt = writer.Position;
-            writer.Out.Zeros(MemoryPoolSize);
+            writer.Out.Zeros(SwitchSectionBuilder.MemoryPoolSize);
             ResolveBuffers(writer, bufferData, bufferBase, poolAt);
         }
 
-        writer.Align(8);
+        long externalAt = file.ExternalFiles.Count == 0 ? 0 : ExternalFileCodec.WriteData(writer, file.ExternalFiles, externalSlots, SwitchBufferLayout.PageSize);
+        writer.Align(ExternalFileCodec.TailAlignment(file.ExternalFiles, SwitchBufferLayout.PageSize));
         int tableAt = writer.Position;
-        var sections = BuildSections(writer, file, layout, stringEnd, bufferBase, poolAt);
+        long externalEnd = tableAt;
+        var sections = SwitchSectionBuilder.Build(writer, file, layout, new SectionBounds(stringEnd, bufferBase, poolAt, externalAt, externalEnd));
         writer.Out.Bytes(new RelocationTable(sections).ToBytes((uint)tableAt));
 
         PatchBlocks(writer, tableAt);
@@ -162,41 +167,6 @@ public static class SwitchFileWriter
     {
         foreach (int slot in writer.PoolSlots) writer.ResolveTo(slot, poolAt);
         writer.ResolveTo(bufferData, bufferBase);
-    }
-
-    // Each pointer goes in the section its target lies in: the main data, the index data, the vertex data or the pool.
-    private static List<RelocationSection> BuildSections(SwitchWriter writer, ResFile file, SwitchBufferLayout layout, int stringEnd, long bufferBase, long poolAt)
-    {
-        var groups = new List<long>[4].Select(_ => new List<long>()).ToArray();
-        foreach (long slot in writer.Pointers.Order())
-        {
-            long target = (long)BitConverter.ToUInt64(writer.Out.Written[(int)slot..((int)slot + 8)]);
-            groups[SectionOf(target, layout, bufferBase, poolAt)].Add(slot);
-        }
-
-        long indexEnd = bufferBase + layout.IndexSize;
-        long poolEnd = poolAt + MemoryPoolSize;
-        var sections = new List<RelocationSection> { new(0, (uint)stringEnd, [.. RelocationEncoder.Encode(groups[0])]) };
-        if (layout.IsEmpty)
-        {
-            int empty = file.Platform == BfresPlatform.Switch2 ? 5 : 4;
-            for (int unused = 0; unused < empty; unused++) sections.Add(new RelocationSection((uint)stringEnd, 0, []));
-            return sections;
-        }
-
-        sections.Add(new RelocationSection((uint)bufferBase, (uint)layout.IndexSize, [.. RelocationEncoder.Encode(groups[1])]));
-        sections.Add(new RelocationSection((uint)indexEnd, (uint)(layout.TotalSize - layout.IndexSize), [.. RelocationEncoder.Encode(groups[2])]));
-        sections.Add(new RelocationSection((uint)poolAt, MemoryPoolSize, [.. RelocationEncoder.Encode(groups[3])]));
-        sections.Add(new RelocationSection((uint)poolEnd, 0, []));
-        if (file.Platform == BfresPlatform.Switch2) sections.Add(new RelocationSection((uint)poolEnd, 0, []));
-        return sections;
-    }
-
-    private static int SectionOf(long target, SwitchBufferLayout layout, long bufferBase, long poolAt)
-    {
-        if (layout.IsEmpty || target < bufferBase) return 0;
-        if (target >= poolAt) return 3;
-        return target < bufferBase + layout.IndexSize ? 1 : 2;
     }
 
     // Chains the linked header blocks: each holds the distance to the next, the last the distance to the relocation table.
@@ -224,6 +194,8 @@ public static class SwitchFileWriter
         int VisibilityAnims,
         int VisibilityAnimDict,
         int BufferInfo,
+        int ExternalFiles,
+        int ExternalFileDict,
         int StringTable,
         int PoolSizeAt);
 }

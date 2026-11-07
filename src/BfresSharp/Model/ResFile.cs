@@ -35,6 +35,8 @@ public sealed class ResFile
 
     public ResDict<ResModel> Models { get; set; } = new();
 
+    public ResDict<ExternalFile> ExternalFiles { get; set; } = new();
+
     public ResDict<SkeletalAnim> SkeletalAnims { get; set; } = new();
 
     public ResDict<VisibilityAnim> VisibilityAnims { get; set; } = new();
