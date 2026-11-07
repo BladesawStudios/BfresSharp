@@ -19,3 +19,6 @@
 [submodule "lib/vendor/SarcSharp"]
 	path = lib/vendor/SarcSharp
 	url = https://github.com/BladesawStudios/SarcSharp
+[submodule "lib/vendor/McSharp"]
+	path = lib/vendor/McSharp
+	url = https://github.com/BladesawStudios/McSharp
