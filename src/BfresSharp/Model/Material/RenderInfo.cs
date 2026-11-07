@@ -19,6 +19,9 @@ public sealed class RenderInfo
 
     public ulong NameHash { get; set; }
 
+    // Where the values sit in the shared data block of a version 10 Switch material; negative until placed.
+    public int DataOffset { get; set; } = -1;
+
     public RenderInfoType Type { get; private set; } = RenderInfoType.Int32;
 
     public int[] Ints { get; private set; } = [];

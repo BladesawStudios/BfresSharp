@@ -9,6 +9,9 @@ public sealed class ParamAnimInfo
 {
     public string Name { get; set; } = "";
 
+    // The hash the file names this entry by when it leaves the name out; zero for a named entry.
+    public ulong NameHash { get; set; }
+
     public ushort BeginCurve { get; set; }
 
     public ushort FloatCurveCount { get; set; }

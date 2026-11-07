@@ -53,6 +53,16 @@ public sealed class SwitchWriter(SwitchProfile profile)
         return slot;
     }
 
+    // Lists an existing field in the relocation table, for pointers whose place is known only after they are written.
+    public void ListPointerAt(int slot) => _pointers.Add(slot);
+
+    // Records an existing field as a name pointer, for fields written ahead of their place in the stream.
+    public void StringPointerAt(int slot, string value)
+    {
+        _pointers.Add(slot);
+        QueueString(slot, value);
+    }
+
     public int Pointer(long target)
     {
         int slot = Pointer();
@@ -82,6 +92,9 @@ public sealed class SwitchWriter(SwitchProfile profile)
         Out.U64(value);
         return slot;
     }
+
+    // A name field: the hash when the file names the entry by hash, otherwise a pointer to the name.
+    public int NamePointer(string name, ulong hash) => hash != 0 ? Unlisted(hash) : StringPointer(name);
 
     public int StringPointer(string? value)
     {

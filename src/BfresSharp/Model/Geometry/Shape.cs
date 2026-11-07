@@ -24,6 +24,9 @@ public sealed class Shape
 
     public byte TargetAttribCount { get; set; }
 
+    // A value some version 9 and later files keep in the last two bytes of the shape header.
+    public ushort Reserved { get; set; }
+
     public List<float> Radii { get; set; } = [];
 
     public List<Vector4> BoundingRadii { get; set; } = [];

@@ -9,8 +9,8 @@ namespace BfresSharp.Switch.Models;
 /// <remarks>
 /// After the magic come the name, the vertex buffer pointer, the mesh array, skin bone indices, key shape array and
 /// dictionary, bounding array and radius pointers and an unused word. Files before version 9 then hold the flags. The
-/// bounding array has one box for each mesh and each sub mesh. Version 10 stores a radius vector for each mesh, or for
-/// each skin bone when the shape is skinned; earlier files store one radius for each mesh.
+/// bounding array has one box for each mesh and each sub mesh. Version 10 stores one radius vector, or one for each skin
+/// bone when the shape is skinned; earlier files store one radius for each mesh.
 /// </remarks>
 public static class ShapeCodec
 {
@@ -33,6 +33,7 @@ public static class ShapeCodec
             VertexBufferIndex = view.U16(counts + 6),
             VertexSkinCount = view.U8(counts + 0xA),
             TargetAttribCount = view.U8(counts + 0xD),
+            Reserved = profile.Modern ? view.U16(counts + 0xE) : (ushort)0,
         };
         long meshes = reader.Pointer(fields + 0x10);
         long skin = reader.Pointer(fields + 0x18);
@@ -62,7 +63,9 @@ public static class ShapeCodec
         if (!profile.Modern) writer.Out.U32(shape.Flags);
         writer.Out.U16((ushort)index).U16(shape.MaterialIndex).U16(shape.BoneIndex).U16(shape.VertexBufferIndex)
             .U16((ushort)shape.SkinBoneIndices.Count).U8(shape.VertexSkinCount).U8((byte)shape.Meshes.Count)
-            .U8((byte)shape.KeyShapes.Count).U8(shape.TargetAttribCount).Zeros(profile.Modern ? 2 : 6);
+            .U8((byte)shape.KeyShapes.Count).U8(shape.TargetAttribCount);
+        if (profile.Modern) writer.Out.U16(shape.Reserved);
+        else writer.Out.Zeros(6);
         return slots;
     }
 
@@ -71,7 +74,8 @@ public static class ShapeCodec
     {
         if (shape.Meshes.Count > 0) writer.Align(8).Resolve(slots.Meshes);
         var meshSlots = shape.Meshes.Select(mesh => MeshCodec.WriteHeader(writer, mesh, layout.FaceOffset(mesh))).ToList();
-        writer.Align(8).Resolve(slots.SkinBoneIndices);
+        // Before version 9 the skin bone pointer is set even when no bone follows.
+        if (shape.SkinBoneIndices.Count > 0 || !writer.Profile.Modern) writer.Align(8).Resolve(slots.SkinBoneIndices);
         foreach (ushort index in shape.SkinBoneIndices) writer.Out.U16(index);
 
         if (shape.SubMeshBoundings.Count > 0)
@@ -126,7 +130,7 @@ public static class ShapeCodec
         var view = reader.View;
         if (reader.Profile.Version.Major >= 10)
         {
-            int count = skinCount == 0 ? meshCount : skinCount;
+            int count = Math.Max(skinCount, 1);
             shape.BoundingRadii = reader.ReadArray(radii, count, 16, offset => new Vector4(view.F32(offset), view.F32(offset + 4), view.F32(offset + 8), view.F32(offset + 12))).ToList();
         }
         else

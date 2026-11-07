@@ -33,7 +33,7 @@ public static class SwitchFileWriter
         var material = file.MaterialAnims.Values.Select(anim => MaterialAnimCodec.WriteHeader(writer, anim)).ToList();
         if (file.VisibilityAnims.Count > 0) writer.Resolve(root.VisibilityAnims);
         var visibility = file.VisibilityAnims.Values.Select(anim => VisibilityAnimCodec.WriteHeader(writer, anim)).ToList();
-        int bufferData = WriteBufferInfo(writer, root, layout);
+        int bufferData = WriteBufferInfo(writer, root, layout, file, models);
         if (file.ExternalFiles.Count > 0) writer.Align(8).Resolve(root.ExternalFiles);
         int[] externalSlots = ExternalFileCodec.WriteEntries(writer, file.ExternalFiles);
         WriteDictionary(writer, root.ModelDict, file.Models);
@@ -111,16 +111,27 @@ public static class SwitchFileWriter
     }
 
     // A file without buffers still carries an empty buffer info block; the header does not point at it.
-    private static int WriteBufferInfo(SwitchWriter writer, RootSlots root, SwitchBufferLayout layout)
+    private static int WriteBufferInfo(SwitchWriter writer, RootSlots root, SwitchBufferLayout layout, ResFile file, List<ModelCodec.Slots> models)
     {
+        if (!layout.IsEmpty && new ModelLayout(writer.Profile).HasExtension)
+        {
+            // Switch 2 files keep the buffer info in the last bytes of the first model's header.
+            int at = models[0].ExtensionAt;
+            writer.ResolveTo(root.BufferInfo, at);
+            writer.Out.SetU32(at, file.BufferInfoKind);
+            writer.Out.SetU32(at + 4, (uint)layout.TotalSize);
+            writer.ListPointerAt(at + 8);
+            return at + 8;
+        }
+
         if (layout.IsEmpty)
         {
-            if (!writer.Profile.Modern) writer.Out.U32(0x22).Zeros(BufferInfoSize - 4);
+            if (!writer.Profile.Modern) writer.Out.U32(file.BufferInfoKind).Zeros(BufferInfoSize - 4);
             return 0;
         }
 
         writer.Resolve(root.BufferInfo);
-        writer.Out.U32(0x22).U32((uint)layout.TotalSize);
+        writer.Out.U32(file.BufferInfoKind).U32((uint)layout.TotalSize);
         int slot = writer.Pointer();
         writer.Out.Zeros(BufferInfoSize - 16);
         return slot;

@@ -18,6 +18,9 @@ public sealed class ResFile
 
     public BfresVersion Version { get; set; }
 
+    // The word that starts the buffer info: 0x22, or 0x24 in Switch 2 files.
+    public uint BufferInfoKind { get; set; } = 0x22;
+
     public byte Alignment { get; set; }
 
     public byte TargetAddressSize { get; set; }

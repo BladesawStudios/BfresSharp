@@ -39,14 +39,15 @@ public static class SwitchSectionBuilder
             return sections;
         }
 
-        long indexEnd = bounds.BufferBase + layout.IndexSize;
+        long indexEnd = bounds.BufferBase + layout.SplitAt;
         long poolEnd = bounds.PoolAt + MemoryPoolSize;
-        sections.Add(new RelocationSection((uint)bounds.BufferBase, (uint)layout.IndexSize, [.. RelocationEncoder.Encode(groups[1])]));
-        sections.Add(new RelocationSection((uint)indexEnd, (uint)(layout.TotalSize - layout.IndexSize), [.. RelocationEncoder.Encode(groups[2])]));
+        sections.Add(new RelocationSection((uint)bounds.BufferBase, (uint)layout.SplitAt, [.. RelocationEncoder.Encode(groups[1])]));
+        sections.Add(new RelocationSection((uint)indexEnd, (uint)(layout.TotalSize - layout.SplitAt), [.. RelocationEncoder.Encode(groups[2])]));
+        // Switch 2 files keep an unused section in front of the memory pool.
+        if (file.Platform == BfresPlatform.Switch2) sections.Add(new RelocationSection((uint)bounds.PoolAt, 0, []));
         sections.Add(new RelocationSection((uint)bounds.PoolAt, MemoryPoolSize, [.. RelocationEncoder.Encode(groups[3])]));
         uint externalStart = hasExternal ? (uint)bounds.ExternalAt : (uint)poolEnd;
         sections.Add(new RelocationSection(externalStart, externalLength, [.. RelocationEncoder.Encode(groups[4])]));
-        if (file.Platform == BfresPlatform.Switch2) sections.Add(new RelocationSection((uint)poolEnd, 0, []));
         return sections;
     }
 
@@ -55,6 +56,6 @@ public static class SwitchSectionBuilder
         if (bounds.ExternalAt != 0 && target >= bounds.ExternalAt) return 4;
         if (layout.IsEmpty || target < bounds.BufferBase) return 0;
         if (target >= bounds.PoolAt) return 3;
-        return target < bounds.BufferBase + layout.IndexSize ? 1 : 2;
+        return target < bounds.BufferBase + layout.SplitAt ? 1 : 2;
     }
 }

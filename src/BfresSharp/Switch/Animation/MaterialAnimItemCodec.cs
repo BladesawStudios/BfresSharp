@@ -24,9 +24,11 @@ public static class MaterialAnimItemCodec
         long counts = at + 0x28;
         int paramCount = view.U16(counts + 10), patternCount = view.U16(counts + 12);
         int constantCount = view.U16(counts + 14), curveCount = view.U16(counts + 16);
+        (string name, ulong hash) = reader.NameOrHash(at);
         var item = new MaterialAnimItem
         {
-            Name = reader.String(at) ?? "",
+            Name = name,
+            NameHash = hash,
             ShaderParamCurveIndex = view.U16(counts),
             TexturePatternCurveIndex = view.U16(counts + 2),
             VisualConstantIndex = view.U16(counts + 4),
@@ -43,7 +45,7 @@ public static class MaterialAnimItemCodec
     // Writes the record and returns the slots of its pointers; the entries follow once every record is written.
     public static Slots WriteHeader(SwitchWriter writer, MaterialAnimItem item)
     {
-        writer.StringPointer(item.Name);
+        writer.NamePointer(item.Name, item.NameHash);
         // A pointer to nothing is not recorded.
         int Slot(int count) => count > 0 ? writer.Pointer() : writer.Unlisted();
         var slots = new Slots(Slot(item.ParamAnimInfos.Count), Slot(item.PatternAnimInfos.Count), Slot(item.Curves.Count), Slot(item.Constants.Count));
@@ -79,9 +81,11 @@ public static class MaterialAnimItemCodec
     private static ParamAnimInfo ReadParam(SwitchReader reader, long at)
     {
         var view = reader.View;
+        (string name, ulong hash) = reader.NameOrHash(at);
         return new ParamAnimInfo
         {
-            Name = reader.String(at) ?? "",
+            Name = name,
+            NameHash = hash,
             BeginCurve = view.U16(at + 8),
             FloatCurveCount = view.U16(at + 10),
             IntCurveCount = view.U16(at + 12),
@@ -94,9 +98,11 @@ public static class MaterialAnimItemCodec
     private static PatternAnimInfo ReadPattern(SwitchReader reader, long at)
     {
         var view = reader.View;
+        (string name, ulong hash) = reader.NameOrHash(at);
         return new PatternAnimInfo
         {
-            Name = reader.String(at) ?? "",
+            Name = name,
+            NameHash = hash,
             CurveIndex = (short)view.U16(at + 8),
             BeginConstant = view.U16(at + 10),
             SubBindIndex = (sbyte)view.U8(at + 12),
@@ -105,14 +111,14 @@ public static class MaterialAnimItemCodec
 
     private static void WriteParam(SwitchWriter writer, ParamAnimInfo info)
     {
-        writer.StringPointer(info.Name);
+        writer.NamePointer(info.Name, info.NameHash);
         writer.Out.U16(info.BeginCurve).U16(info.FloatCurveCount).U16(info.IntCurveCount).U16(info.BeginConstant)
             .U16(info.ConstantCount).U16(info.SubBindIndex).U32(0);
     }
 
     private static void WritePattern(SwitchWriter writer, PatternAnimInfo info)
     {
-        writer.StringPointer(info.Name);
+        writer.NamePointer(info.Name, info.NameHash);
         writer.Out.U16((ushort)info.CurveIndex).U16(info.BeginConstant).U8((byte)info.SubBindIndex).Zeros(3);
     }
 }

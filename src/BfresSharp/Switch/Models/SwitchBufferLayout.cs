@@ -1,3 +1,4 @@
+using BfresSharp.Container;
 using BfresSharp.Model;
 using BfresSharp.Model.Geometry;
 
@@ -5,26 +6,28 @@ namespace BfresSharp.Switch.Models;
 
 /// <summary>Places the index and vertex data of a file's models in the buffer data section.</summary>
 /// <remarks>
-/// Index data of every mesh comes first, each padded to 8 bytes, then the streams of every vertex buffer, each aligned
+/// Index data of every mesh comes first, each padded to 8 bytes (256 in Switch 2 files), then the streams of every vertex buffer, each aligned
 /// to the buffer's GPU alignment. Offsets are relative to the start of the section, which is page aligned in the file.
 /// </remarks>
 public sealed class SwitchBufferLayout
 {
     public const int PageSize = 0x1000;
+    private const int Switch2FaceAlignment = 0x100;
     private readonly Dictionary<Mesh, uint> _faces = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<VertexBuffer, uint> _streams = new(ReferenceEqualityComparer.Instance);
 
     public SwitchBufferLayout(ResFile file)
     {
         long position = 0;
+        int faceAlignment = file.Platform == BfresPlatform.Switch2 ? Switch2FaceAlignment : 8;
         foreach (Mesh mesh in file.Models.Values.SelectMany(model => model.Shapes.Values).SelectMany(shape => shape.Meshes))
         {
-            position = Align(position, 8);
+            position = Align(position, faceAlignment);
             _faces[mesh] = (uint)position;
             position += mesh.IndexData.Length;
         }
 
-        IndexSize = Align(position, 8);
+        IndexSize = Align(position, faceAlignment);
         position = IndexSize;
         foreach (VertexBuffer buffer in file.Models.Values.SelectMany(model => model.VertexBuffers))
         {
@@ -36,6 +39,7 @@ public sealed class SwitchBufferLayout
         }
 
         TotalSize = Align(position, PageSize);
+        SplitAt = _streams.Count > 0 ? _streams.Values.Min() : IndexSize;
         Models = file.Models;
     }
 
@@ -44,6 +48,9 @@ public sealed class SwitchBufferLayout
     public long IndexSize { get; }
 
     public long TotalSize { get; }
+
+    // Where the vertex data starts, which is where the relocation table's index data section ends.
+    public long SplitAt { get; }
 
     public bool IsEmpty => TotalSize == 0;
 

@@ -1,5 +1,6 @@
 using BfresSharp.Errors;
 using BfresSharp.Model;
+using BfresSharp.Model.Material;
 using BfresSharp.Switch.Common;
 using BfresSharp.Switch.IO;
 
@@ -13,42 +14,60 @@ namespace BfresSharp.Switch.Models;
 /// </remarks>
 public static class ModelCodec
 {
-    public static int Size(SwitchProfile profile) => profile.Modern ? 0x68 : 0x78;
+    public static int Size(SwitchProfile profile) => new ModelLayout(profile).Size;
 
     public static ResModel Read(SwitchReader reader, long at)
     {
-        // TODO: Versions 9 and later have a different pointer layout and the shader assign array.
-        RequireSupported(reader.Profile, at);
+        var layout = new ModelLayout(reader.Profile);
         var view = reader.View;
-        long fields = at + 0x10;
-        int buffers = view.U16(fields + 0x58);
+        long fields = at + layout.Fields;
+        int buffers = view.U16(fields + layout.Counts);
+        int materialSize = MaterialSize(reader.Profile);
         var model = new ResModel
         {
             Name = reader.String(fields) ?? "",
             Path = reader.String(fields + 8) ?? "",
-            TotalVertexCount = view.U32(fields + 0x60),
-            Skeleton = SkeletonCodec.Read(reader, reader.Pointer(fields + 0x10)),
-            Shapes = reader.ReadDict(fields + 0x28, fields + 0x20, ShapeCodec.Size(reader.Profile), offset => ShapeCodec.Read(reader, offset)),
-            Materials = reader.ReadDict(fields + 0x38, fields + 0x30, MaterialCodec.Size(reader.Profile), offset => MaterialCodec.Read(reader, offset)),
-            UserData = UserDataCodec.ReadDict(reader, fields + 0x48, fields + 0x40),
+            Flags = reader.Profile.Modern ? view.U32(at + 4) : 0,
+            TotalVertexCount = reader.Profile.Modern ? 0 : view.U32(fields + layout.Counts + 8),
+            Skeleton = SkeletonCodec.Read(reader, reader.Pointer(fields + ModelLayout.Skeleton)),
+            Shapes = reader.ReadDict(fields + ModelLayout.ShapeDict, fields + ModelLayout.Shapes, ShapeCodec.Size(reader.Profile), offset => ShapeCodec.Read(reader, offset)),
+            Materials = reader.ReadDict(fields + layout.MaterialDict, fields + ModelLayout.Materials, materialSize, offset => ReadMaterial(reader, offset)),
+            UserData = UserDataCodec.ReadDict(reader, fields + layout.UserDict, fields + layout.UserArray),
         };
-        long vertexBuffers = reader.Pointer(fields + 0x18);
+        long vertexBuffers = reader.Pointer(fields + ModelLayout.VertexBuffers);
         if (vertexBuffers != 0) model.VertexBuffers = reader.ReadArray(vertexBuffers, buffers, VertexBufferCodec.Size(reader.Profile), offset => VertexBufferCodec.Read(reader, offset)).ToList();
         return model;
     }
 
+    private static int MaterialSize(SwitchProfile profile) => profile.Version.Major >= 10 ? MaterialV10Codec.Size : MaterialCodec.Size(profile);
+
+    private static Material ReadMaterial(SwitchReader reader, long at)
+    {
+        return reader.Profile.Version.Major >= 10 ? MaterialV10Codec.Read(reader, at) : MaterialCodec.Read(reader, at);
+    }
+
     public static Slots WriteHeader(SwitchWriter writer, ResModel model)
     {
-        RequireSupported(writer.Profile, writer.Position);
+        var profile = writer.Profile;
+        var layout = new ModelLayout(profile);
         writer.Out.Bytes("FMDL"u8);
-        writer.Block();
+        if (profile.Modern) writer.Out.U32(model.Flags);
+        else writer.Block();
         writer.StringPointer(model.Name);
         writer.StringPointer(model.Path);
-        var slots = new Slots(writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer());
+        int skeleton = writer.Pointer(), buffers = writer.Pointer(), shapes = writer.Pointer(), shapeDict = writer.Pointer(), materials = writer.Pointer();
+        if (profile.Version.Major == 9) writer.Unlisted();
+        int materialDict = writer.Pointer();
+        var section = new MaterialSection(profile, model);
+        int assigns = layout.HasShaderAssigns ? writer.Pointer() : 0;
+        var slots = new Slots(skeleton, buffers, shapes, shapeDict, materials, materialDict, writer.Pointer(), writer.Pointer(), assigns, section);
         writer.Unlisted();
-        writer.Out.U16((ushort)model.VertexBuffers.Count).U16((ushort)model.Shapes.Count).U16((ushort)model.Materials.Count)
-            .U16((ushort)model.UserData.Count).U32(model.TotalVertexCount).U32(0);
-        return slots;
+        writer.Out.U16((ushort)model.VertexBuffers.Count).U16((ushort)model.Shapes.Count).U16((ushort)model.Materials.Count);
+        if (profile.Modern) writer.Out.U16((ushort)section.Assigns.Count).U16((ushort)model.UserData.Count).U16(0).U32(0);
+        else writer.Out.U16((ushort)model.UserData.Count).U32(model.TotalVertexCount).U32(0);
+        int extension = writer.Position;
+        if (layout.HasExtension) writer.Out.Zeros(ModelLayout.ExtensionSize);
+        return slots with { ExtensionAt = extension };
     }
 
     // The vertex buffer, material and shape headers, the skeleton, the dictionaries and then what each section points to.
@@ -66,7 +85,8 @@ public static class ModelCodec
         }
 
         if (any || model.Materials.Count > 0) writer.Align(8).Resolve(slots.Materials);
-        var materialSlots = model.Materials.Values.Select((material, index) => MaterialCodec.WriteHeader(writer, material, index)).ToList();
+        slots.Section.WriteHeaders(writer);
+        slots.Section.WriteAssignRecords(writer, slots.ShaderAssigns);
         if (any || model.Shapes.Count > 0) writer.Align(8).Resolve(slots.Shapes);
         var shapeSlots = model.Shapes.Values.Select((shape, index) => ShapeCodec.WriteHeader(writer, shape, bufferPositions[shape.VertexBufferIndex], index)).ToList();
         // An empty user data array is only pointed at when the model has geometry before it.
@@ -77,11 +97,13 @@ public static class ModelCodec
         SkeletonCodec.WriteBody(writer, model.Skeleton, skeletonSlots);
         WriteDictionary(writer, slots.ShapeDict, model.Shapes);
         WriteDictionary(writer, slots.MaterialDict, model.Materials);
-        UserDataCodec.WriteDict(writer, model.UserData, slots.UserDict);
+        if (!writer.Profile.Modern) UserDataCodec.WriteDict(writer, model.UserData, slots.UserDict);
         for (int index = 0; index < shapeSlots.Count; index++) ShapeCodec.WriteBody(writer, model.Shapes.Values[index], shapeSlots[index], layout);
         for (int index = 0; index < bufferSlots.Count; index++) VertexBufferCodec.WriteBody(writer, model.VertexBuffers[index], bufferSlots[index]);
         UserDataCodec.WriteValuesAligned(writer, model.UserData, userSlots);
-        for (int index = 0; index < materialSlots.Count; index++) MaterialCodec.WriteBody(writer, model.Materials.Values[index], materialSlots[index]);
+        slots.Section.WriteBodies(writer);
+        // Version 9 and later keep the user data dictionary after everything else.
+        if (writer.Profile.Modern) UserDataCodec.WriteDict(writer, model.UserData, slots.UserDict);
     }
 
     private static void WriteDictionary<T>(SwitchWriter writer, int slot, ResDict<T> dict)
@@ -91,11 +113,7 @@ public static class ModelCodec
         SwitchDictCodec.Write(writer, dict);
     }
 
-    private static void RequireSupported(SwitchProfile profile, long at)
-    {
-        if (profile.Version.Major >= 9) throw new BfresFormatException("Models of version 9 and later are not supported yet", at);
-    }
-
     public readonly record struct Slots(
-        int Skeleton, int VertexBuffers, int Shapes, int ShapeDict, int Materials, int MaterialDict, int UserArray, int UserDict);
+        int Skeleton, int VertexBuffers, int Shapes, int ShapeDict, int Materials, int MaterialDict, int UserArray, int UserDict, int ShaderAssigns,
+        MaterialSection Section, int ExtensionAt = 0);
 }

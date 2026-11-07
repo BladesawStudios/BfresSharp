@@ -16,9 +16,15 @@ public static class RenderInfoCodec
     {
         var view = reader.View;
         var info = new RenderInfo { Name = reader.String(at) ?? "" };
-        long data = reader.Pointer(at + 8);
-        int count = view.U16(at + 0x10);
-        switch ((RenderInfoType)view.U8(at + 0x12))
+        ReadValues(reader, info, (RenderInfoType)view.U8(at + 0x12), reader.Pointer(at + 8), view.U16(at + 0x10));
+        return info;
+    }
+
+    // Reads the count values of a render info, which are integers, floats or name pointers.
+    public static void ReadValues(SwitchReader reader, RenderInfo info, RenderInfoType type, long data, int count)
+    {
+        var view = reader.View;
+        switch (type)
         {
             case RenderInfoType.Int32:
                 info.SetValue(data == 0 ? [] : reader.ReadArray(data, count, 4, offset => view.I32(offset)));
@@ -30,8 +36,6 @@ public static class RenderInfoCodec
                 info.SetValue(data == 0 ? [] : reader.ReadArray(data, count, 8, offset => reader.String(offset) ?? ""));
                 break;
         }
-
-        return info;
     }
 
     // Writes the record and returns the slot of its value pointer.
@@ -58,6 +62,38 @@ public static class RenderInfoCodec
         }
 
         writer.Align(8);
+    }
+
+    // The size in bytes of a render info's values: 8 for a name pointer and 4 for an integer or float.
+    public static int ValueLength(RenderInfo info) => info.Count * (info.Type == RenderInfoType.String ? 8 : 4);
+
+    // Version 10 packs the values of all render infos into a block of the given size, each at its own offset.
+    public static void WriteBlock(SwitchWriter writer, IReadOnlyList<RenderInfo> infos, int size)
+    {
+        int start = writer.Position;
+        writer.Out.Zeros(size);
+        foreach (RenderInfo info in infos)
+        {
+            int at = start + info.DataOffset;
+            switch (info.Type)
+            {
+                case RenderInfoType.Int32: for (int index = 0; index < info.Ints.Length; index++) writer.Out.SetU32(at + index * 4, (uint)info.Ints[index]); break;
+                case RenderInfoType.Single: for (int index = 0; index < info.Floats.Length; index++) writer.Out.SetU32(at + index * 4, BitConverter.SingleToUInt32Bits(info.Floats[index])); break;
+                default: for (int index = 0; index < info.Strings.Length; index++) writer.StringPointerAt(at + index * 8, info.Strings[index]); break;
+            }
+        }
+    }
+
+    // Places the values of render infos that have no offset yet: name pointers first, then the rest, in list order.
+    public static void PlaceValues(IReadOnlyList<RenderInfo> infos)
+    {
+        if (infos.All(info => info.DataOffset >= 0)) return;
+        int offset = 0;
+        foreach (RenderInfo info in infos.Where(info => info.Type == RenderInfoType.String).Concat(infos.Where(info => info.Type != RenderInfoType.String)))
+        {
+            info.DataOffset = offset;
+            offset += ValueLength(info);
+        }
     }
 
     private static void WriteValue(SwitchWriter writer, RenderInfo info)

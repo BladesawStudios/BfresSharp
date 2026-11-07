@@ -73,7 +73,7 @@ public static class MeshCodec
         writer.Align(8).Resolve(slots.Unknown);
         writer.Out.Zeros(BufferInfoWords * 8);
         writer.Resolve(slots.SizeRecord);
-        writer.Out.U32((uint)mesh.IndexData.Length).U32(mesh.BufferFlags).Zeros(8 + SizeRecordPadding);
+        writer.Out.U32((uint)mesh.IndexData.Length).U32(mesh.BufferFlags).Zeros(8 + (writer.Profile.Modern ? 0 : SizeRecordPadding));
     }
 
     public readonly record struct Slots(int SubMeshes, int Unknown, int SizeRecord);

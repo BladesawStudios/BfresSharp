@@ -80,11 +80,10 @@ public static class VertexBufferCodec
         foreach (VertexStream stream in buffer.Streams) writer.Out.U32((uint)stream.Data.Length).U32(stream.GpuAccessFlags).Zeros(8);
         writer.Align(8).Resolve(slots.Strides);
         foreach (VertexStream stream in buffer.Streams) writer.Out.U32(stream.Stride).Zeros(12);
-        writer.Out.Zeros(StridePadding);
+        if (!writer.Profile.Modern) writer.Out.Zeros(StridePadding);
         writer.Align(8).Resolve(slots.Unknown2);
         writer.Out.Zeros(8 * buffer.Streams.Count);
-        writer.Align(8).Resolve(slots.AttributeDict);
-        SwitchDictCodec.Write(writer, buffer.Attributes);
+        SwitchDictCodec.WriteAt(writer, slots.AttributeDict, buffer.Attributes);
     }
 
     public static long Align(long value, int alignment) => alignment <= 1 ? value : (value + alignment - 1) / alignment * alignment;

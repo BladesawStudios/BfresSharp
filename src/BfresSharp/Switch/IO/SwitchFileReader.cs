@@ -45,7 +45,11 @@ public static class SwitchFileReader
         }
 
         long bufferInfo = reader.Pointer(layout.BufferInfo);
-        if (bufferInfo != 0) reader.BufferBase = (long)view.U64(bufferInfo + 8);
+        if (bufferInfo != 0)
+        {
+            reader.BufferBase = (long)view.U64(bufferInfo + 8);
+            file.BufferInfoKind = view.U32(bufferInfo);
+        }
         file.Models = reader.ReadDict(SwitchRootLayout.ModelDict, SwitchRootLayout.Models, ModelCodec.Size(profile), at => ModelCodec.Read(reader, at));
         int counts = layout.AnimCounts;
         file.SkeletalAnims = reader.ReadDict(layout.SkeletalAnims + 8, layout.SkeletalAnims, SkeletalAnimCodec.Size(profile), at => SkeletalAnimCodec.Read(reader, at));

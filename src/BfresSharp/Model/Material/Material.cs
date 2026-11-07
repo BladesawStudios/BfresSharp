@@ -24,6 +24,11 @@ public sealed class Material
 
     public byte[] ShaderParamData { get; set; } = [];
 
+    // Version 10 Switch files only: the runtime lookup for each parameter and the size of the render info data block.
+    public int[] ParamIndices { get; set; } = [];
+
+    public ushort RenderInfoSize { get; set; }
+
     public byte[] VolatileFlags { get; set; } = [];
 
     public ResDict<UserData> UserData { get; set; } = new();

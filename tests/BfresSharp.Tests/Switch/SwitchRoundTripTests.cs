@@ -9,10 +9,12 @@ namespace BfresSharp.Tests.Switch;
 
 public sealed class SwitchRoundTripTests(ITestOutputHelper output)
 {
+    private static int FailureLimit => int.TryParse(Environment.GetEnvironmentVariable("BFRES_FAIL_LIMIT"), out int limit) ? limit : 10;
+
     [CorpusFact]
     public void FilesWithImplementedSectionsWriteBackIdentically()
     {
-        int roundTripped = 0, unsupported = 0;
+        int roundTripped = 0, unsupported = 0, failed = 0;
         var failures = new List<string>();
         foreach (string folder in GameFiles.Folders)
         {
@@ -32,11 +34,11 @@ public sealed class SwitchRoundTripTests(ITestOutputHelper output)
 
                 string? difference = ByteDiff.Describe(data, SwitchFileWriter.Write(file));
                 if (difference is null) roundTripped++;
-                else if (failures.Count < 10) failures.Add($"{name} {header.Version}: {difference}");
+                else if (++failed > 0 && failures.Count < FailureLimit) failures.Add($"{name} {header.Version}: {difference}");
             }
         }
 
-        output.WriteLine($"round tripped {roundTripped}, not yet readable {unsupported}, failed {failures.Count}+");
+        output.WriteLine($"round tripped {roundTripped}, not yet readable {unsupported}, failed {failed}");
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 }

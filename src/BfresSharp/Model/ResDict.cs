@@ -1,4 +1,5 @@
 using System.Collections;
+using BfresSharp.Dictionaries;
 
 namespace BfresSharp.Model;
 
@@ -34,6 +35,13 @@ public sealed class ResDict<T> : IReadOnlyList<KeyValuePair<string, T>>
     }
 
     public bool HasHashedKeys => _hashes.Any(hash => hash.HasValue);
+
+    // The search tree as the file had it. A tree over hashes cannot be rebuilt without the names, so it is kept to write back.
+    public IReadOnlyList<DictNode>? Layout { get; set; }
+
+    // Whether the kept tree still describes these entries: the same hashes in the same order.
+    public bool LayoutMatches => Layout is { } nodes && nodes.Count == Count + 1
+        && Enumerable.Range(0, Count).All(index => nodes[index + 1].Hash == _hashes[index]);
 
     public void Add(string key, T value, ulong? hash = null)
     {

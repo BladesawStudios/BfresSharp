@@ -46,7 +46,7 @@ public static class SkeletonCodec
         var slots = new Slots(writer.Pointer(), writer.Pointer(), writer.Pointer(), writer.Pointer(), 0);
         writer.Unlisted();
         if (profile.Version.Major == 8) writer.Out.Zeros(16);
-        int mirrored = profile.Modern ? writer.Pointer() : 0;
+        int mirrored = profile.Modern ? (skeleton.MirroredBoneIndices.Length > 0 ? writer.Pointer() : writer.Unlisted()) : 0;
         if (!profile.Modern) writer.Out.U32(skeleton.RawFlags);
         writer.Out.U16((ushort)skeleton.Bones.Count).U16((ushort)skeleton.NumSmoothMatrices).U16((ushort)skeleton.NumRigidMatrices);
         writer.Out.Zeros(profile.Modern ? 2 : 6);
@@ -59,7 +59,7 @@ public static class SkeletonCodec
         if (skeleton.Bones.Count > 0) writer.Align(8).Resolve(slots.BoneArray);
         var boneSlots = BoneCodec.WriteHeaders(writer, skeleton.Bones);
         WriteMatrixLists(writer, skeleton, slots);
-        if (slots.Mirrored != 0)
+        if (slots.Mirrored != 0 && skeleton.MirroredBoneIndices.Length > 0)
         {
             writer.Resolve(slots.Mirrored);
             foreach (ushort index in skeleton.MirroredBoneIndices) writer.Out.U16(index);
@@ -75,12 +75,13 @@ public static class SkeletonCodec
         WriteBoneUserData(writer, skeleton, boneSlots);
     }
 
-    // Both lists are pointed at even when empty, as the files do.
+    // Before version 9 both lists are pointed at even when empty, as the files do.
     private static void WriteMatrixLists(SwitchWriter writer, Skeleton skeleton, Slots slots)
     {
-        writer.Align(8).Resolve(slots.MatrixToBone);
+        bool modern = writer.Profile.Modern;
+        if (!modern || skeleton.MatrixToBoneList.Count > 0) writer.Align(8).Resolve(slots.MatrixToBone);
         foreach (ushort index in skeleton.MatrixToBoneList) writer.Out.U16(index);
-        writer.Align(8).Resolve(slots.InverseMatrices);
+        if (!modern || skeleton.InverseModelMatrices.Count > 0) writer.Align(8).Resolve(slots.InverseMatrices);
         foreach (Matrix3x4 matrix in skeleton.InverseModelMatrices)
         {
             foreach (float value in matrix.ToArray()) writer.Out.F32(value);

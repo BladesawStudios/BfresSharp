@@ -37,6 +37,14 @@ public sealed class SwitchReader(ByteView view, SwitchProfile profile)
         return value != 0 && value > (ulong)View.Length ? (0, value) : ((long)value, null);
     }
 
+    // A name field that holds the name's hash instead of a pointer when the file leaves the name out.
+    public (string Name, ulong Hash) NameOrHash(long at)
+    {
+        (long target, ulong? hash) = PointerOrHash(at);
+        if (hash is { } value) return ($"0x{value:X16}", value);
+        return (target == 0 ? "" : StringAtTarget(target), 0);
+    }
+
     public string? String(long pointerAt)
     {
         long target = Pointer(pointerAt);
@@ -90,9 +98,13 @@ public sealed class SwitchReader(ByteView view, SwitchProfile profile)
         long arrayAt = Pointer(arrayPointerAt);
         IReadOnlyList<DictNode> nodes = Dictionary(dictAt);
         for (int index = 1; index < nodes.Count; index++)
-            result.Add(nodes[index].Key ?? "", readElement(arrayAt + (index - 1L) * elementSize), nodes[index].Hash);
+            result.Add(KeyOf(nodes[index]), readElement(arrayAt + (index - 1L) * elementSize), nodes[index].Hash);
+        if (result.HasHashedKeys) result.Layout = nodes;
         return result;
     }
+
+    // The text of a key, or the hash in hexadecimal for a key the file stores as a hash.
+    public static string KeyOf(DictNode node) => node.Key ?? (node.Hash is { } hash ? $"0x{hash:X16}" : "");
 
     public T[] ReadArray<T>(long arrayAt, int count, int elementSize, Func<long, T> readElement)
     {
