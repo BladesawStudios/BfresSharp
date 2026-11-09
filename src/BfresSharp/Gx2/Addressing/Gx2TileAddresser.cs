@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace BfresSharp.Gx2.Addressing;
 
 /// <summary>Finds where the pixels of one slice of a micro or macro tiled level are stored.</summary>
@@ -5,7 +7,8 @@ namespace BfresSharp.Gx2.Addressing;
 /// Everything that is the same for every pixel of the slice is worked out once. A micro tile of 8x8 pixels then needs
 /// one call to <see cref="Origin"/>, which finds the tile's place in the surface, and each pixel in it one call to
 /// <see cref="Address"/> with its entry in <see cref="Offsets"/>. Macro tiled modes spread tiles over the pipes and banks
-/// of the console's memory; the pipe and bank of a tile become bits 8 to 10 of its address. The level has one sample.
+/// of the console's memory; the pipe and bank of a tile become bits 8 to 10 of its address. Most tiles are a base address plus
+/// the pixel's <see cref="SpreadOffsets"/> entry, which lets a caller address them without the per-pixel work. The level has one sample.
 /// </remarks>
 internal sealed class Gx2TileAddresser
 {
@@ -29,6 +32,7 @@ internal sealed class Gx2TileAddresser
         uint bits = level.BitsPerElement;
         _macro = !Gx2TileModes.IsMicroTiled(mode);
         Offsets = Gx2PixelOrder.Offsets(bits, thickness, _macro).AsMemory((int)(slice % thickness * 64), 64);
+        SpreadOffsets = _macro ? Spread(Offsets.Span) : Offsets;
 
         if (!_macro)
         {
@@ -73,6 +77,23 @@ internal sealed class Gx2TileAddresser
         return ((macroOffset + _sliceOffset) >> 3, bank << 9 | pipe << 8);
     }
 
+    // The offsets with the bits above the eighth moved up three, as an address does; added to a tile base they give pixel addresses.
+    public ReadOnlyMemory<uint> SpreadOffsets { get; }
+
+    // Whether every pixel of the tile at this start is its spread offset added to TileBase: the tile starts on a multiple of
+    // 256, or does not reach past the next multiple.
+    public bool AddsToBase(ulong start, uint lastOffset) => !_macro || (start & 255) == 0 || (start & 255) + lastOffset < 256;
+
+    public ulong TileBase(ulong start, uint pipeBank) => _macro ? pipeBank | (start & ~255UL) << 3 | start & 255 : start;
+
+    private static uint[] Spread(ReadOnlySpan<uint> offsets)
+    {
+        var spread = new uint[offsets.Length];
+        for (int i = 0; i < spread.Length; i++) spread[i] = offsets[i] & 255 | (offsets[i] & ~255u) << 3;
+        return spread;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ulong Address(ulong start, uint pipeBank, uint offset)
     {
         ulong total = start + offset;
