@@ -61,6 +61,18 @@ public sealed class ResDict<T> : IReadOnlyList<KeyValuePair<string, T>>
         if (_index is null && _keys.Count > IndexThreshold) BuildIndex();
     }
 
+    /// <summary>Puts a value at a position, shifting the ones after it; the way to put back what <see cref="RemoveAt"/> took out, with the hash it was read with.</summary>
+    public void Insert(int index, string key, T value, ulong? hash = null)
+    {
+        if ((uint)index > (uint)_keys.Count) throw new ArgumentOutOfRangeException(nameof(index));
+        if (IndexOf(key) >= 0) throw new ArgumentException($"Key \"{key}\" already exists.", nameof(key));
+        _keys.Insert(index, key);
+        _values.Insert(index, value);
+        if (hash.HasValue) (_hashes ??= [.. new ulong?[_keys.Count - 1]]).Insert(index, hash);
+        else _hashes?.Insert(index, null);
+        if (_index is not null || _keys.Count > IndexThreshold) BuildIndex();
+    }
+
     public bool ContainsKey(string key) => IndexOf(key) >= 0;
 
     // Short dictionaries are searched in order, which beats hashing; longer ones get an index once they outgrow that.
