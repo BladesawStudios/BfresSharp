@@ -50,6 +50,17 @@ public static class SwitchFileReader
             reader.BufferBase = (long)view.U64(bufferInfo + 8);
             file.BufferInfoKind = view.U32(bufferInfo);
         }
+        else
+        {
+            // A model unpacked from the mesh codec (Tears of the Kingdom's .bfres.mc) has no pointer to its buffer info; its file size word points past the sections at a small header whose
+            // first word is where the memory pool's data starts (the indices come first, then each vertex buffer).
+            long sectionsEnd = view.U32(0x1C);
+            if (sectionsEnd >= 0x20 && sectionsEnd + 8 <= view.Length)
+            {
+                long start = view.U32(sectionsEnd);
+                if (start > sectionsEnd && start < view.Length) reader.BufferBase = start;
+            }
+        }
         file.Models = reader.ReadDict(SwitchRootLayout.ModelDict, SwitchRootLayout.Models, ModelCodec.Size(profile), at => ModelCodec.Read(reader, at));
         int counts = layout.AnimCounts;
         file.SkeletalAnims = reader.ReadDict(layout.SkeletalAnims + 8, layout.SkeletalAnims, SkeletalAnimCodec.Size(profile), at => SkeletalAnimCodec.Read(reader, at));

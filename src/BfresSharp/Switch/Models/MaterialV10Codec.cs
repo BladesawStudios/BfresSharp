@@ -34,7 +34,8 @@ public static class MaterialV10Codec
             UserData = UserDataCodec.ReadDict(reader, fields + 0x70, fields + 0x68),
         };
         long info = reader.Pointer(fields + 8);
-        ShaderAssignV10Codec.Tables tables = ShaderInfoCodec.Read(reader, info, material.ShaderAssign);
+        // A material of an effect's resource has no shader information at all.
+        ShaderAssignV10Codec.Tables tables = info == 0 ? ShaderAssignV10Codec.Tables.Empty : ShaderInfoCodec.Read(reader, info, material.ShaderAssign);
         ReadRenderInfos(reader, material, tables, fields);
         ReadParams(reader, material, tables, fields);
         long names = reader.Pointer(fields + 0x18);

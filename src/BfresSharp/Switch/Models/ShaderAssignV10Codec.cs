@@ -27,7 +27,11 @@ public static class ShaderAssignV10Codec
         IReadOnlyList<DictNode> ParamNodes,
         IReadOnlyList<DictNode> AttribNodes,
         IReadOnlyList<DictNode> SamplerNodes,
-        IReadOnlyList<DictNode> OptionNodes);
+        IReadOnlyList<DictNode> OptionNodes)
+    {
+        /// <summary>The tables of a material that has no shader information: nothing is listed.</summary>
+        public static Tables Empty { get; } = new(0, 0, 0, 0, 0, [], [], [], [], []);
+    }
 
     public static Tables Read(SwitchReader reader, long at, ShaderAssign assign)
     {
